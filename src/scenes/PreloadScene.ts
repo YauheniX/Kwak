@@ -8,15 +8,10 @@ export class PreloadScene extends Phaser.Scene {
   preload(): void {
     // Create loading text
     const { width, height } = this.cameras.main;
-    const loadingText = this.add.text(
-      width / 2,
-      height / 2,
-      'Loading...',
-      {
-        fontSize: '32px',
-        color: '#ffffff',
-      }
-    );
+    const loadingText = this.add.text(width / 2, height / 2, 'Loading...', {
+      fontSize: '32px',
+      color: '#ffffff',
+    });
     loadingText.setOrigin(0.5);
 
     // Since we're using shapes, there's nothing to actually preload

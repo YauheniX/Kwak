@@ -6,12 +6,7 @@ export class Fragment {
   public collected: boolean = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    this.sprite = scene.add.circle(
-      x,
-      y,
-      GameConfig.fragmentSize,
-      GameConfig.fragmentColor
-    );
+    this.sprite = scene.add.circle(x, y, GameConfig.fragmentSize, GameConfig.fragmentColor);
     scene.physics.add.existing(this.sprite, true); // true = static body
   }
 
@@ -32,12 +27,7 @@ export class Treasure {
   private locked: boolean = true;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    this.sprite = scene.add.circle(
-      x,
-      y,
-      GameConfig.treasureSize,
-      GameConfig.treasureColor
-    );
+    this.sprite = scene.add.circle(x, y, GameConfig.treasureSize, GameConfig.treasureColor);
     scene.physics.add.existing(this.sprite, true);
     this.sprite.setAlpha(0.3); // Visually show it's locked
   }

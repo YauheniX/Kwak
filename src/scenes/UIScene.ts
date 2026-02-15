@@ -13,30 +13,20 @@ export class UIScene extends Phaser.Scene {
     const { width } = this.cameras.main;
 
     // Health display
-    this.healthText = this.add.text(
-      10,
-      10,
-      'Health: 100',
-      {
-        fontSize: `${GameConfig.fontSize}px`,
-        color: GameConfig.uiFontColor,
-        backgroundColor: '#000000',
-        padding: { x: 10, y: 5 },
-      }
-    );
+    this.healthText = this.add.text(10, 10, 'Health: 100', {
+      fontSize: `${GameConfig.fontSize}px`,
+      color: GameConfig.uiFontColor,
+      backgroundColor: '#000000',
+      padding: { x: 10, y: 5 },
+    });
 
     // Fragment display
-    this.fragmentText = this.add.text(
-      width - 10,
-      10,
-      'Fragments: 0 / 4',
-      {
-        fontSize: `${GameConfig.fontSize}px`,
-        color: GameConfig.uiFontColor,
-        backgroundColor: '#000000',
-        padding: { x: 10, y: 5 },
-      }
-    );
+    this.fragmentText = this.add.text(width - 10, 10, 'Fragments: 0 / 4', {
+      fontSize: `${GameConfig.fontSize}px`,
+      color: GameConfig.uiFontColor,
+      backgroundColor: '#000000',
+      padding: { x: 10, y: 5 },
+    });
     this.fragmentText.setOrigin(1, 0);
 
     // Listen for updates from GameScene

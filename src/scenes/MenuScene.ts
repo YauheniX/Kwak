@@ -21,15 +21,10 @@ export class MenuScene extends Phaser.Scene {
     title.setOrigin(0.5);
 
     // Subtitle
-    const subtitle = this.add.text(
-      width / 2,
-      height / 4 + 60,
-      'A Roguelike Adventure',
-      {
-        fontSize: '24px',
-        color: '#ffffff',
-      }
-    );
+    const subtitle = this.add.text(width / 2, height / 4 + 60, 'A Roguelike Adventure', {
+      fontSize: '24px',
+      color: '#ffffff',
+    });
     subtitle.setOrigin(0.5);
 
     // Instructions

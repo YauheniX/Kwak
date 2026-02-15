@@ -3,24 +3,17 @@ import { GameConfig } from '../config/gameConfig';
 
 export class Enemy {
   public sprite: Phaser.GameObjects.Arc;
-  private scene: Phaser.Scene;
   private targetX: number;
   private targetY: number;
   private moveTimer: number = 0;
   private moveDelay: number = 1000; // 1 second between moves
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    this.scene = scene;
-    this.sprite = scene.add.circle(
-      x,
-      y,
-      GameConfig.enemySize,
-      GameConfig.enemyColor
-    );
+    this.sprite = scene.add.circle(x, y, GameConfig.enemySize, GameConfig.enemyColor);
     scene.physics.add.existing(this.sprite);
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     body.setCollideWorldBounds(true);
-    
+
     this.targetX = x;
     this.targetY = y;
   }

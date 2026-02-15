@@ -29,9 +29,7 @@ export class RoomGenerator {
       };
 
       // Avoid exact overlaps (simple check)
-      const overlapping = this.rooms.some(
-        (r) => r.x === room.x && r.y === room.y
-      );
+      const overlapping = this.rooms.some((r) => r.x === room.x && r.y === room.y);
 
       if (!overlapping) {
         this.rooms.push(room);
@@ -77,7 +75,7 @@ export class RoomGenerator {
         const isRightWall = tileX === room.x + room.width - 1;
         const isTopWall = tileY === room.y;
         const isBottomWall = tileY === room.y + room.height - 1;
-        
+
         return isLeftWall || isRightWall || isTopWall || isBottomWall;
       }
     }

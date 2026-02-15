@@ -71,7 +71,7 @@ export class GameScene extends Phaser.Scene {
     this.wallGraphics = this.add.graphics();
     this.wallGraphics.fillStyle(0x444444, 1);
 
-    const { tileSize, roomWidth, roomHeight } = GameConfig;
+    const { tileSize } = GameConfig;
     const rooms = this.roomGenerator.getRooms();
 
     // Draw room walls
@@ -79,12 +79,7 @@ export class GameScene extends Phaser.Scene {
       for (let x = room.x; x < room.x + room.width; x++) {
         for (let y = room.y; y < room.y + room.height; y++) {
           if (this.roomGenerator.isWall(x, y)) {
-            this.wallGraphics.fillRect(
-              x * tileSize,
-              y * tileSize,
-              tileSize,
-              tileSize
-            );
+            this.wallGraphics.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
           }
         }
       }
@@ -166,7 +161,7 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  update(_time: number, delta: number): void {
+  override update(_time: number, delta: number): void {
     // Update player
     this.player.update(this.cursors);
 

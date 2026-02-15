@@ -4,16 +4,9 @@ import { GameConfig } from '../config/gameConfig';
 export class Player {
   public sprite: Phaser.GameObjects.Arc;
   public health: number = 100;
-  private scene: Phaser.Scene;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    this.scene = scene;
-    this.sprite = scene.add.circle(
-      x,
-      y,
-      GameConfig.playerSize,
-      GameConfig.playerColor
-    );
+    this.sprite = scene.add.circle(x, y, GameConfig.playerSize, GameConfig.playerColor);
     scene.physics.add.existing(this.sprite);
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     body.setCollideWorldBounds(true);
@@ -21,7 +14,7 @@ export class Player {
 
   update(cursors: Phaser.Types.Input.Keyboard.CursorKeys): void {
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
-    
+
     body.setVelocity(0);
 
     if (cursors.left.isDown) {

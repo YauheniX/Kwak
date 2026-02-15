@@ -20,14 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [
-    BootScene,
-    PreloadScene,
-    MenuScene,
-    GameScene,
-    UIScene,
-    GameOverScene,
-  ],
+  scene: [BootScene, PreloadScene, MenuScene, GameScene, UIScene, GameOverScene],
 };
 
 new Phaser.Game(config);
