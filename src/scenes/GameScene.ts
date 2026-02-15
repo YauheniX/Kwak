@@ -1,21 +1,26 @@
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
-import { Fragment, Treasure } from '../entities/Collectible';
+import { Treasure } from '../entities/Collectible';
 import { RoomGenerator } from '../systems/roomGenerator';
 import { EnemySpawner } from '../systems/enemySpawner';
+import { MapFragmentSystem } from '../systems/mapFragment';
+import { CurrencySystem } from '../systems/currency';
+import { Merchant } from '../entities/Merchant';
 import { GameConfig } from '../config/gameConfig';
 import { ProgressManager } from '../utils/progressManager';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
   private enemies: Enemy[] = [];
-  private fragments: Fragment[] = [];
   private treasure!: Treasure;
   private roomGenerator!: RoomGenerator;
   private enemySpawner!: EnemySpawner;
+  private mapFragmentSystem!: MapFragmentSystem;
+  private currencySystem!: CurrencySystem;
+  private merchant?: Merchant;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private fragmentsCollected: number = 0;
+  private interactKey!: Phaser.Input.Keyboard.Key;
   private progressManager: ProgressManager;
   private wallGraphics!: Phaser.GameObjects.Graphics;
   private lastHitTime: number = 0;
@@ -62,16 +67,54 @@ export class GameScene extends Phaser.Scene {
         dungeon.spawnRoomId
       );
 
-      // Ensure at least one fragment per dungeon (distribute across rooms)
-      const fragmentCount = Math.max(1, GameConfig.fragmentsRequired);
-      for (let i = 0; i < fragmentCount; i++) {
-        // Distribute fragments across different rooms when possible
-        const roomIndex = i % dungeon.rooms.length;
-        const room = dungeon.rooms[roomIndex];
-        const pos = this.roomGenerator.getRandomPositionInRoom(room);
-        const fragment = new Fragment(this, pos.x, pos.y);
-        this.fragments.push(fragment);
+      // Initialize currency system (starting with some gold)
+      this.currencySystem = new CurrencySystem(150);
+
+      // Initialize map fragment system
+      this.mapFragmentSystem = new MapFragmentSystem({
+        minFragments: 3,
+        maxFragments: 5,
+        merchantFragmentChance: 0.5,
+        fragmentPurchaseCost: 100,
+      });
+
+      // Generate fragment data
+      const fragmentData = this.mapFragmentSystem.generateFragments(
+        dungeon.rooms,
+        dungeon.shopRoomId
+      );
+
+      // Place fragments in rooms
+      for (const fragment of fragmentData) {
+        if (fragment.locationType === 'ROOM' && fragment.roomId !== undefined) {
+          const room = dungeon.rooms.find(r => r.id === fragment.roomId);
+          if (room) {
+            const pos = this.roomGenerator.getRandomPositionInRoom(room);
+            this.mapFragmentSystem.updateFragmentPosition(fragment.id, pos.x, pos.y);
+          }
+        }
       }
+
+      // Create merchant in shop room
+      const shopRoom = dungeon.rooms.find(r => r.id === dungeon.shopRoomId);
+      if (shopRoom) {
+        const merchantPos = this.roomGenerator.getRandomPositionInRoom(shopRoom);
+        this.merchant = new Merchant(this, merchantPos.x, merchantPos.y);
+
+        // Update merchant fragment position
+        const merchantFragments = this.mapFragmentSystem.getMerchantFragments();
+        if (merchantFragments.length > 0) {
+          // Place fragment near merchant
+          this.mapFragmentSystem.updateFragmentPosition(
+            merchantFragments[0].id,
+            merchantPos.x + 40,
+            merchantPos.y
+          );
+        }
+      }
+
+      // Create fragment sprites
+      this.mapFragmentSystem.createFragmentSprites(this);
 
       // Create treasure in treasure room
       const treasureRoom = dungeon.rooms.find((r) => r.id === dungeon.treasureRoomId);
@@ -87,6 +130,7 @@ export class GameScene extends Phaser.Scene {
 
       // Setup input
       this.cursors = this.input.keyboard!.createCursorKeys();
+      this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
       // Setup pointer/touch input for mobile
       this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -192,14 +236,18 @@ export class GameScene extends Phaser.Scene {
 
   private setupCollisions(): void {
     // Player collects fragments
-    this.fragments.forEach((fragment) => {
-      this.physics.add.overlap(
-        this.player.sprite,
-        fragment.sprite,
-        () => this.collectFragment(fragment),
-        undefined,
-        this
-      );
+    const fragmentSprites = this.mapFragmentSystem.getFragments();
+    fragmentSprites.forEach((fragmentData) => {
+      const sprite = this.mapFragmentSystem.getFragmentSprite(fragmentData.id);
+      if (sprite && fragmentData.state === 'UNCOLLECTED') {
+        this.physics.add.overlap(
+          this.player.sprite,
+          sprite.sprite,
+          () => this.collectFragment(fragmentData.id),
+          undefined,
+          this
+        );
+      }
     });
 
     // Player collects treasure
@@ -214,14 +262,86 @@ export class GameScene extends Phaser.Scene {
     // Don't setup enemy collisions here - we'll check manually in update
   }
 
-  private collectFragment(fragment: Fragment): void {
-    if (!fragment.collected) {
-      fragment.collect();
-      this.fragmentsCollected++;
+  private collectFragment(fragmentId: number): void {
+    if (this.mapFragmentSystem.collectFragment(fragmentId)) {
       this.emitGameState();
 
       // Check if all fragments collected
-      if (this.fragmentsCollected >= GameConfig.fragmentsRequired) {
+      if (this.mapFragmentSystem.areAllFragmentsCollected()) {
+        this.treasure.unlock();
+      }
+    }
+  }
+
+  private purchaseFragment(): void {
+    if (!this.merchant || !this.merchant.isPlayerInRange()) {
+      return;
+    }
+
+    const merchantFragments = this.mapFragmentSystem.getMerchantFragments();
+    if (merchantFragments.length === 0) {
+      return;
+    }
+
+    const fragment = merchantFragments[0];
+    if (fragment.state !== 'AVAILABLE_FOR_PURCHASE') {
+      return;
+    }
+
+    const cost = fragment.cost ?? 100;
+    if (!this.currencySystem.canAfford(cost)) {
+      // Show "not enough gold" message
+      const text = this.add.text(
+        this.merchant.sprite.x,
+        this.merchant.sprite.y - 50,
+        'Not enough gold!',
+        {
+          fontSize: '14px',
+          color: '#ff0000',
+          backgroundColor: '#000000',
+          padding: { x: 5, y: 3 },
+        }
+      );
+      text.setOrigin(0.5);
+      this.tweens.add({
+        targets: text,
+        y: text.y - 20,
+        alpha: 0,
+        duration: 1500,
+        onComplete: () => text.destroy(),
+      });
+      return;
+    }
+
+    // Purchase the fragment
+    const result = this.mapFragmentSystem.purchaseFragment(fragment.id);
+    if (result.success) {
+      this.currencySystem.removeGold(result.cost);
+      this.emitGameState();
+
+      // Show purchase confirmation
+      const text = this.add.text(
+        this.merchant.sprite.x,
+        this.merchant.sprite.y - 50,
+        `Fragment purchased! (-${result.cost} gold)`,
+        {
+          fontSize: '14px',
+          color: '#00ff00',
+          backgroundColor: '#000000',
+          padding: { x: 5, y: 3 },
+        }
+      );
+      text.setOrigin(0.5);
+      this.tweens.add({
+        targets: text,
+        y: text.y - 20,
+        alpha: 0,
+        duration: 1500,
+        onComplete: () => text.destroy(),
+      });
+
+      // Check if all fragments collected
+      if (this.mapFragmentSystem.areAllFragmentsCollected()) {
         this.treasure.unlock();
       }
     }
@@ -230,16 +350,17 @@ export class GameScene extends Phaser.Scene {
   private collectTreasure(): void {
     if (!this.treasure.isLocked()) {
       // Win! Lazy-load GameOverScene before transitioning
-      this.progressManager.recordGameWon(this.fragmentsCollected);
+      const fragmentsCollected = this.mapFragmentSystem.getCollectedCount();
+      this.progressManager.recordGameWon(fragmentsCollected);
       this.scene.stop('UIScene');
       
       // Ensure GameOverScene is loaded before starting it
       if (window.sceneManager) {
         window.sceneManager.loadScene('GameOverScene').then(() => {
-          this.scene.start('GameOverScene', { won: true, fragments: this.fragmentsCollected });
+          this.scene.start('GameOverScene', { won: true, fragments: fragmentsCollected });
         });
       } else {
-        this.scene.start('GameOverScene', { won: true, fragments: this.fragmentsCollected });
+        this.scene.start('GameOverScene', { won: true, fragments: fragmentsCollected });
       }
     }
   }
@@ -264,7 +385,8 @@ export class GameScene extends Phaser.Scene {
 
       if (this.player.health <= 0) {
         // Game over - lazy-load GameOverScene before transitioning
-        this.progressManager.recordGameLost(this.fragmentsCollected);
+        const fragmentsCollected = this.mapFragmentSystem.getCollectedCount();
+        this.progressManager.recordGameLost(fragmentsCollected);
         this.scene.stop('UIScene');
         
         // Ensure GameOverScene is loaded before starting it
@@ -272,13 +394,13 @@ export class GameScene extends Phaser.Scene {
           window.sceneManager.loadScene('GameOverScene').then(() => {
             this.scene.start('GameOverScene', {
               won: false,
-              fragments: this.fragmentsCollected,
+              fragments: fragmentsCollected,
             });
           });
         } else {
           this.scene.start('GameOverScene', {
             won: false,
-            fragments: this.fragmentsCollected,
+            fragments: fragmentsCollected,
           });
         }
       }
@@ -288,14 +410,27 @@ export class GameScene extends Phaser.Scene {
   private emitGameState(): void {
     this.events.emit('updateUI', {
       health: this.player.health,
-      fragments: this.fragmentsCollected,
-      fragmentsRequired: GameConfig.fragmentsRequired,
+      fragments: this.mapFragmentSystem.getCollectedCount(),
+      fragmentsRequired: this.mapFragmentSystem.getTotalFragments(),
+      gold: this.currencySystem.getGold(),
+      fragmentData: this.mapFragmentSystem.getFragments(),
     });
   }
 
   override update(_time: number, delta: number): void {
     // Update player
     this.player.update(this.cursors);
+
+    // Update merchant if exists
+    if (this.merchant) {
+      const playerPos = this.player.getPosition();
+      this.merchant.update(playerPos.x, playerPos.y);
+
+      // Handle interact key
+      if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+        this.purchaseFragment();
+      }
+    }
 
     // Update enemies
     const playerPos = this.player.getPosition();
