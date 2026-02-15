@@ -50,6 +50,9 @@ export class RoomGenerator {
   private rooms: Room[] = [];
   private corridors: Corridor[] = [];
   private config: Required<RoomGenerationConfig>;
+  
+  // Maximum fraction of room dimensions that can be used for margin
+  private static readonly MARGIN_DIVISOR = 3;
 
   constructor(config: RoomGenerationConfig = {}) {
     // Initialize configuration with defaults
@@ -252,6 +255,14 @@ export class RoomGenerator {
   }
 
   /**
+   * Get the configured corridor width
+   * @returns Corridor width in tiles
+   */
+  getCorridorWidth(): number {
+    return this.config.corridorWidth;
+  }
+
+  /**
    * Get a random position inside a room (avoiding walls)
    * @param room Room to get position from
    * @param minMargin Minimum margin from walls in tiles (default: 2)
@@ -259,7 +270,12 @@ export class RoomGenerator {
    */
   getRandomPositionInRoom(room: Room, minMargin: number = 2): { x: number; y: number } {
     const { tileSize } = GameConfig;
-    const margin = Math.min(minMargin, Math.floor(room.width / 3), Math.floor(room.height / 3));
+    // Ensure margin doesn't consume more than 1/3 of room dimensions
+    const margin = Math.min(
+      minMargin,
+      Math.floor(room.width / RoomGenerator.MARGIN_DIVISOR),
+      Math.floor(room.height / RoomGenerator.MARGIN_DIVISOR)
+    );
 
     return {
       x: (room.x + margin + Math.floor(Math.random() * (room.width - margin * 2))) * tileSize,

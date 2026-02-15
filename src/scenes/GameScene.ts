@@ -159,10 +159,11 @@ export class GameScene extends Phaser.Scene {
 
     // Draw corridor walls
     // Corridors are included in the isWall check, but we need to draw their borders
+    const corridorWidth = this.roomGenerator.getCorridorWidth();
+    const halfWidth = Math.floor(corridorWidth / 2);
+    
     for (const corridor of corridors) {
       const { x1, y1, x2, y2 } = corridor;
-      const corridorWidth = 3; // Default corridor width
-      const halfWidth = Math.floor(corridorWidth / 2);
 
       // Horizontal corridor
       if (y1 === y2) {
