@@ -4,10 +4,28 @@ import { GameConfig } from '../config/gameConfig';
  * Represents a room in the dungeon
  */
 export interface Room {
+  id: number; // Unique room identifier
   x: number; // Top-left x coordinate in tile units
   y: number; // Top-left y coordinate in tile units
   width: number; // Width in tile units
   height: number; // Height in tile units
+  centerX: number; // Center x coordinate (computed)
+  centerY: number; // Center y coordinate (computed)
+  type: RoomType; // Room classification
+  depth: number; // Graph distance from spawn (for difficulty scaling)
+}
+
+/**
+ * Room classification types
+ */
+export enum RoomType {
+  SPAWN = 'SPAWN',
+  BOSS = 'BOSS',
+  TREASURE = 'TREASURE',
+  ELITE = 'ELITE',
+  SHOP = 'SHOP',
+  COMBAT = 'COMBAT',
+  SECRET = 'SECRET',
 }
 
 /**
@@ -18,155 +36,223 @@ export interface Corridor {
   y1: number; // Start y coordinate in tile units
   x2: number; // End x coordinate in tile units
   y2: number; // End y coordinate in tile units
+  room1Id: number; // ID of first connected room
+  room2Id: number; // ID of second connected room
+}
+
+/**
+ * Edge in Delaunay triangulation
+ */
+interface Edge {
+  room1Id: number;
+  room2Id: number;
+  weight: number; // Distance between rooms
+}
+
+/**
+ * Dungeon structure with all generation data
+ */
+export interface Dungeon {
+  rooms: Room[];
+  corridors: Corridor[];
+  graph: Map<number, number[]>; // Adjacency list: roomId -> connected roomIds
+  spawnRoomId: number;
+  bossRoomId: number;
+  treasureRoomId: number;
+  shopRoomId: number;
+  eliteRoomIds: number[];
+  secretRoomIds: number[];
 }
 
 /**
  * Configuration for room generation
  */
 export interface RoomGenerationConfig {
-  // Total number of rooms to generate (default: from GameConfig.maxRooms)
-  roomCount?: number;
-  // Minimum room width in tiles (default: 8)
-  minRoomWidth?: number;
-  // Maximum room width in tiles (default: from GameConfig.roomWidth)
-  maxRoomWidth?: number;
-  // Minimum room height in tiles (default: 6)
-  minRoomHeight?: number;
-  // Maximum room height in tiles (default: from GameConfig.roomHeight)
-  maxRoomHeight?: number;
-  // Maximum placement attempts per room (default: 30)
-  maxPlacementAttempts?: number;
-  // Minimum distance between rooms in tiles (default: 2)
-  minRoomSpacing?: number;
-  // Corridor width in tiles (default: 3)
-  corridorWidth?: number;
+  roomCount?: number; // Total rooms to generate (default: 5)
+  minRoomSize?: number; // Minimum room dimension (default: 6)
+  maxRoomSize?: number; // Maximum room dimension (default: 20)
+  mapWidth?: number; // Map bounds width in tiles (default: 100)
+  mapHeight?: number; // Map bounds height in tiles (default: 100)
+  roomSpacing?: number; // Minimum spacing between rooms (default: 2)
+  corridorWidth?: number; // Corridor width (default: 3)
+  loopEdgePercentage?: number; // Percentage of extra edges to add (default: 15)
+  eliteRoomPercentage?: number; // Percentage of elite rooms (default: 10)
+  secretRoomChance?: number; // Chance to generate secret room (default: 5)
+  seed?: number; // Random seed for deterministic generation
+  difficultyScaling?: number; // Difficulty increase per depth (default: 1.0)
 }
 
 /**
- * Enhanced procedural dungeon room generator
- * Generates interconnected rooms with corridors ensuring all areas are reachable
+ * Seeded random number generator for deterministic dungeon generation
+ */
+class SeededRandom {
+  private seed: number;
+
+  constructor(seed: number) {
+    this.seed = seed;
+  }
+
+  next(): number {
+    // Linear congruential generator
+    this.seed = (this.seed * 1103515245 + 12345) % 2147483648;
+    return this.seed / 2147483648;
+  }
+
+  nextInt(min: number, max: number): number {
+    return Math.floor(this.next() * (max - min + 1)) + min;
+  }
+
+  nextFloat(min: number, max: number): number {
+    return this.next() * (max - min) + min;
+  }
+
+  shuffle<T>(array: T[]): T[] {
+    const result = [...array];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(this.next() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }
+}
+
+/**
+ * Enhanced procedural dungeon generator using graph-based approach
+ * 
+ * ALGORITHM:
+ * 1. Generate N random rectangular rooms with collision detection
+ * 2. Build connectivity graph using Delaunay triangulation
+ * 3. Create Minimum Spanning Tree (Prim's algorithm)
+ * 4. Add 15-20% extra edges for loops
+ * 5. Generate L-shaped corridors between connected rooms
+ * 6. Classify rooms (SPAWN, BOSS, TREASURE, etc.)
+ * 7. Compute depth-based difficulty scaling
  */
 export class RoomGenerator {
   private rooms: Room[] = [];
   private corridors: Corridor[] = [];
+  private graph: Map<number, number[]> = new Map();
   private config: Required<RoomGenerationConfig>;
-  
-  // Maximum fraction of room dimensions that can be used for margin
-  private static readonly MARGIN_DIVISOR = 3;
+  private rng: SeededRandom;
+  private roomIdCounter: number = 0;
 
   constructor(config: RoomGenerationConfig = {}) {
     // Initialize configuration with defaults
     this.config = {
       roomCount: config.roomCount ?? GameConfig.maxRooms,
-      minRoomWidth: config.minRoomWidth ?? 8,
-      maxRoomWidth: config.maxRoomWidth ?? GameConfig.roomWidth,
-      minRoomHeight: config.minRoomHeight ?? 6,
-      maxRoomHeight: config.maxRoomHeight ?? GameConfig.roomHeight,
-      maxPlacementAttempts: config.maxPlacementAttempts ?? 30,
-      minRoomSpacing: config.minRoomSpacing ?? 2,
+      minRoomSize: config.minRoomSize ?? 6,
+      maxRoomSize: config.maxRoomSize ?? GameConfig.roomWidth,
+      mapWidth: config.mapWidth ?? 100,
+      mapHeight: config.mapHeight ?? 100,
+      roomSpacing: config.roomSpacing ?? 2,
       corridorWidth: config.corridorWidth ?? 3,
+      loopEdgePercentage: config.loopEdgePercentage ?? 15,
+      eliteRoomPercentage: config.eliteRoomPercentage ?? 10,
+      secretRoomChance: config.secretRoomChance ?? 5,
+      seed: config.seed ?? Date.now(),
+      difficultyScaling: config.difficultyScaling ?? 1.0,
     };
+
+    this.rng = new SeededRandom(this.config.seed);
   }
 
   /**
-   * Generate a dungeon with the specified number of rooms
-   * Ensures all rooms are connected via corridors
-   * @param count Number of rooms to generate (overrides config if provided)
-   * @returns Array of generated rooms
+   * Generate complete dungeon with all features
+   * @returns Dungeon structure with rooms, corridors, and metadata
    */
-  generateRooms(count?: number): Room[] {
-    this.rooms = [];
-    this.corridors = [];
-    const targetRoomCount = count ?? this.config.roomCount;
+  generateDungeon(): Dungeon {
+    // Step 1: Generate random rooms
+    this.generateRooms();
 
-    // Ensure at least one room is generated
-    const actualRoomCount = Math.max(1, targetRoomCount);
-
-    // Generate the first room at the origin
-    const firstRoom = this.createRoom(0, 0);
-    this.rooms.push(firstRoom);
-
-    // Generate additional rooms
-    for (let i = 1; i < actualRoomCount; i++) {
-      const newRoom = this.placeNewRoom();
-      if (newRoom) {
-        this.rooms.push(newRoom);
-        // Connect the new room to the nearest existing room
-        this.connectRoomToNearest(newRoom);
-      }
+    if (this.rooms.length === 0) {
+      throw new Error('Failed to generate any rooms');
     }
 
-    return this.rooms;
-  }
+    // Step 2: Build connectivity graph
+    this.buildConnectivityGraph();
 
-  /**
-   * Create a room with randomized dimensions
-   * @param centerX Approximate center x position in tile units
-   * @param centerY Approximate center y position in tile units
-   * @returns A new room
-   */
-  private createRoom(centerX: number, centerY: number): Room {
-    const width =
-      this.config.minRoomWidth +
-      Math.floor(Math.random() * (this.config.maxRoomWidth - this.config.minRoomWidth + 1));
-    const height =
-      this.config.minRoomHeight +
-      Math.floor(Math.random() * (this.config.maxRoomHeight - this.config.minRoomHeight + 1));
+    // Step 3: Generate corridors from graph
+    this.generateCorridorsFromGraph();
+
+    // Step 4: Classify rooms
+    const classification = this.classifyRooms();
+
+    // Step 5: Compute depth and difficulty
+    this.computeRoomDepth(classification.spawnRoomId);
+
+    // Step 6: Generate secret rooms (5% chance)
+    if (this.rng.next() * 100 < this.config.secretRoomChance) {
+      this.generateSecretRoom();
+    }
 
     return {
-      x: Math.floor(centerX - width / 2),
-      y: Math.floor(centerY - height / 2),
-      width,
-      height,
+      rooms: this.rooms,
+      corridors: this.corridors,
+      graph: this.graph,
+      spawnRoomId: classification.spawnRoomId,
+      bossRoomId: classification.bossRoomId,
+      treasureRoomId: classification.treasureRoomId,
+      shopRoomId: classification.shopRoomId,
+      eliteRoomIds: classification.eliteRoomIds,
+      secretRoomIds: this.rooms.filter((r) => r.type === RoomType.SECRET).map((r) => r.id),
     };
   }
 
   /**
-   * Attempt to place a new room that doesn't overlap with existing rooms
-   * @returns A new room or null if placement failed
+   * Step 1: Generate N random rectangular rooms
+   * Reject rooms that overlap with existing rooms
    */
-  private placeNewRoom(): Room | null {
-    for (let attempt = 0; attempt < this.config.maxPlacementAttempts; attempt++) {
-      // Pick a random existing room to place the new room near
-      const existingRoom = this.rooms[Math.floor(Math.random() * this.rooms.length)];
+  private generateRooms(): void {
+    this.rooms = [];
+    this.roomIdCounter = 0;
+    const maxAttempts = this.config.roomCount * 10;
+    let attempts = 0;
 
-      // Generate random offset from the existing room
-      const angle = Math.random() * Math.PI * 2;
-      const distance = 15 + Math.random() * 20; // Distance in tiles
+    while (this.rooms.length < this.config.roomCount && attempts < maxAttempts) {
+      const room = this.createRandomRoom();
 
-      const centerX = Math.floor(
-        existingRoom.x + existingRoom.width / 2 + Math.cos(angle) * distance
-      );
-      const centerY = Math.floor(
-        existingRoom.y + existingRoom.height / 2 + Math.sin(angle) * distance
-      );
-
-      const newRoom = this.createRoom(centerX, centerY);
-
-      // Check if the new room overlaps with any existing room
-      if (!this.hasOverlap(newRoom)) {
-        return newRoom;
+      if (!this.hasOverlap(room)) {
+        this.rooms.push(room);
       }
-    }
 
-    return null;
+      attempts++;
+    }
   }
 
   /**
-   * Check if a room overlaps with any existing rooms (including spacing)
-   * @param room Room to check
-   * @returns true if there is an overlap, false otherwise
+   * Create a random room with random dimensions and position
+   */
+  private createRandomRoom(): Room {
+    const width = this.rng.nextInt(this.config.minRoomSize, this.config.maxRoomSize);
+    const height = this.rng.nextInt(this.config.minRoomSize, this.config.maxRoomSize);
+    const x = this.rng.nextInt(0, this.config.mapWidth - width);
+    const y = this.rng.nextInt(0, this.config.mapHeight - height);
+
+    return {
+      id: this.roomIdCounter++,
+      x,
+      y,
+      width,
+      height,
+      centerX: x + width / 2,
+      centerY: y + height / 2,
+      type: RoomType.COMBAT, // Default, will be classified later
+      depth: 0,
+    };
+  }
+
+  /**
+   * Check if room overlaps with any existing room (with spacing buffer)
    */
   private hasOverlap(room: Room): boolean {
-    const spacing = this.config.minRoomSpacing;
+    const spacing = this.config.roomSpacing;
 
-    for (const existingRoom of this.rooms) {
-      // Check if rooms overlap (with spacing buffer)
+    for (const existing of this.rooms) {
       if (
-        room.x - spacing < existingRoom.x + existingRoom.width &&
-        room.x + room.width + spacing > existingRoom.x &&
-        room.y - spacing < existingRoom.y + existingRoom.height &&
-        room.y + room.height + spacing > existingRoom.y
+        room.x - spacing < existing.x + existing.width &&
+        room.x + room.width + spacing > existing.x &&
+        room.y - spacing < existing.y + existing.height &&
+        room.y + room.height + spacing > existing.y
       ) {
         return true;
       }
@@ -176,120 +262,400 @@ export class RoomGenerator {
   }
 
   /**
-   * Connect a room to the nearest existing room via a corridor
-   * @param room Room to connect
+   * Step 2: Build connectivity graph using Delaunay + MST + loops
    */
-  private connectRoomToNearest(room: Room): void {
-    let nearestRoom: Room | null = null;
-    let minDistance = Infinity;
+  private buildConnectivityGraph(): void {
+    this.graph = new Map();
 
-    // Find the nearest room
-    for (const existingRoom of this.rooms) {
-      if (existingRoom === room) continue;
+    // Initialize adjacency list
+    for (const room of this.rooms) {
+      this.graph.set(room.id, []);
+    }
 
-      const distance = this.getDistanceBetweenRooms(room, existingRoom);
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestRoom = existingRoom;
+    // Compute Delaunay triangulation edges
+    const triangulationEdges = this.computeDelaunayTriangulation();
+
+    // Build Minimum Spanning Tree using Prim's algorithm
+    const mstEdges = this.computeMinimumSpanningTree(triangulationEdges);
+
+    // Add MST edges to graph
+    for (const edge of mstEdges) {
+      this.addEdgeToGraph(edge.room1Id, edge.room2Id);
+    }
+
+    // Add loop edges (15-20% of remaining edges)
+    const remainingEdges = triangulationEdges.filter(
+      (e) => !mstEdges.find((m) => this.edgesEqual(e, m))
+    );
+    const loopCount = Math.floor(
+      (remainingEdges.length * this.config.loopEdgePercentage) / 100
+    );
+
+    for (let i = 0; i < Math.min(loopCount, remainingEdges.length); i++) {
+      const edge = remainingEdges[i];
+      this.addEdgeToGraph(edge.room1Id, edge.room2Id);
+    }
+  }
+
+  /**
+   * Compute Delaunay triangulation using Bowyer-Watson algorithm
+   * (Simplified version - creates edges between nearby rooms)
+   */
+  private computeDelaunayTriangulation(): Edge[] {
+    const edges: Edge[] = [];
+
+    // For each pair of rooms, create an edge
+    for (let i = 0; i < this.rooms.length; i++) {
+      for (let j = i + 1; j < this.rooms.length; j++) {
+        const room1 = this.rooms[i];
+        const room2 = this.rooms[j];
+        const distance = Math.sqrt(
+          Math.pow(room2.centerX - room1.centerX, 2) +
+            Math.pow(room2.centerY - room1.centerY, 2)
+        );
+
+        edges.push({
+          room1Id: room1.id,
+          room2Id: room2.id,
+          weight: distance,
+        });
       }
     }
 
-    if (nearestRoom) {
-      this.createCorridor(room, nearestRoom);
+    // Sort by distance
+    edges.sort((a, b) => a.weight - b.weight);
+
+    return edges;
+  }
+
+  /**
+   * Compute Minimum Spanning Tree using Prim's algorithm
+   */
+  private computeMinimumSpanningTree(edges: Edge[]): Edge[] {
+    if (this.rooms.length === 0) return [];
+
+    const mstEdges: Edge[] = [];
+    const visited = new Set<number>();
+    visited.add(this.rooms[0].id);
+
+    while (visited.size < this.rooms.length) {
+      let minEdge: Edge | null = null;
+      let minWeight = Infinity;
+
+      // Find minimum edge connecting visited to unvisited
+      for (const edge of edges) {
+        const hasRoom1 = visited.has(edge.room1Id);
+        const hasRoom2 = visited.has(edge.room2Id);
+
+        // Edge connects visited to unvisited
+        if (hasRoom1 !== hasRoom2 && edge.weight < minWeight) {
+          minEdge = edge;
+          minWeight = edge.weight;
+        }
+      }
+
+      if (!minEdge) break; // No more connections possible
+
+      mstEdges.push(minEdge);
+      visited.add(minEdge.room1Id);
+      visited.add(minEdge.room2Id);
+    }
+
+    return mstEdges;
+  }
+
+  /**
+   * Add edge to adjacency list (bidirectional)
+   */
+  private addEdgeToGraph(room1Id: number, room2Id: number): void {
+    this.graph.get(room1Id)?.push(room2Id);
+    this.graph.get(room2Id)?.push(room1Id);
+  }
+
+  /**
+   * Check if two edges are equal (order-independent)
+   */
+  private edgesEqual(e1: Edge, e2: Edge): boolean {
+    return (
+      (e1.room1Id === e2.room1Id && e1.room2Id === e2.room2Id) ||
+      (e1.room1Id === e2.room2Id && e1.room2Id === e2.room1Id)
+    );
+  }
+
+  /**
+   * Step 3: Generate corridors from connectivity graph
+   */
+  private generateCorridorsFromGraph(): void {
+    this.corridors = [];
+    const processedEdges = new Set<string>();
+
+    for (const [roomId, connectedIds] of this.graph) {
+      for (const connectedId of connectedIds) {
+        const edgeKey = this.getEdgeKey(roomId, connectedId);
+
+        if (!processedEdges.has(edgeKey)) {
+          processedEdges.add(edgeKey);
+          this.createCorridor(roomId, connectedId);
+        }
+      }
     }
   }
 
   /**
-   * Calculate the distance between two room centers
-   * @param room1 First room
-   * @param room2 Second room
-   * @returns Distance between room centers
+   * Create unique edge key (order-independent)
    */
-  private getDistanceBetweenRooms(room1: Room, room2: Room): number {
-    const center1X = room1.x + room1.width / 2;
-    const center1Y = room1.y + room1.height / 2;
-    const center2X = room2.x + room2.width / 2;
-    const center2Y = room2.y + room2.height / 2;
-
-    return Math.sqrt(Math.pow(center2X - center1X, 2) + Math.pow(center2Y - center1Y, 2));
+  private getEdgeKey(room1Id: number, room2Id: number): string {
+    return room1Id < room2Id ? `${room1Id}-${room2Id}` : `${room2Id}-${room1Id}`;
   }
 
   /**
-   * Create a corridor connecting two rooms
-   * Uses L-shaped corridors (horizontal then vertical or vice versa)
-   * @param room1 First room
-   * @param room2 Second room
+   * Create L-shaped corridor between two rooms
    */
-  private createCorridor(room1: Room, room2: Room): void {
-    const center1X = Math.floor(room1.x + room1.width / 2);
-    const center1Y = Math.floor(room1.y + room1.height / 2);
-    const center2X = Math.floor(room2.x + room2.width / 2);
-    const center2Y = Math.floor(room2.y + room2.height / 2);
+  private createCorridor(room1Id: number, room2Id: number): void {
+    const room1 = this.rooms.find((r) => r.id === room1Id);
+    const room2 = this.rooms.find((r) => r.id === room2Id);
 
-    // Randomly choose to go horizontal first or vertical first
-    if (Math.random() < 0.5) {
+    if (!room1 || !room2) return;
+
+    const center1X = Math.floor(room1.centerX);
+    const center1Y = Math.floor(room1.centerY);
+    const center2X = Math.floor(room2.centerX);
+    const center2Y = Math.floor(room2.centerY);
+
+    // Randomly choose horizontal-first or vertical-first
+    if (this.rng.next() < 0.5) {
       // Horizontal then vertical
-      this.corridors.push({ x1: center1X, y1: center1Y, x2: center2X, y2: center1Y });
-      this.corridors.push({ x1: center2X, y1: center1Y, x2: center2X, y2: center2Y });
+      if (center1X !== center2X) {
+        this.corridors.push({
+          x1: center1X,
+          y1: center1Y,
+          x2: center2X,
+          y2: center1Y,
+          room1Id,
+          room2Id,
+        });
+      }
+      if (center1Y !== center2Y) {
+        this.corridors.push({
+          x1: center2X,
+          y1: center1Y,
+          x2: center2X,
+          y2: center2Y,
+          room1Id,
+          room2Id,
+        });
+      }
     } else {
       // Vertical then horizontal
-      this.corridors.push({ x1: center1X, y1: center1Y, x2: center1X, y2: center2Y });
-      this.corridors.push({ x1: center1X, y1: center2Y, x2: center2X, y2: center2Y });
+      if (center1Y !== center2Y) {
+        this.corridors.push({
+          x1: center1X,
+          y1: center1Y,
+          x2: center1X,
+          y2: center2Y,
+          room1Id,
+          room2Id,
+        });
+      }
+      if (center1X !== center2X) {
+        this.corridors.push({
+          x1: center1X,
+          y1: center2Y,
+          x2: center2X,
+          y2: center2Y,
+          room1Id,
+          room2Id,
+        });
+      }
     }
   }
 
   /**
-   * Get all generated rooms
-   * @returns Array of rooms
+   * Step 4: Classify rooms based on graph structure
+   */
+  private classifyRooms(): {
+    spawnRoomId: number;
+    bossRoomId: number;
+    treasureRoomId: number;
+    shopRoomId: number;
+    eliteRoomIds: number[];
+  } {
+    // First room = SPAWN
+    const spawnRoom = this.rooms[0];
+    spawnRoom.type = RoomType.SPAWN;
+
+    // Farthest room from spawn (by graph distance) = BOSS
+    const distances = this.computeGraphDistances(spawnRoom.id);
+    let maxDistance = 0;
+    let bossRoomId = spawnRoom.id;
+
+    for (const [roomId, distance] of distances) {
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        bossRoomId = roomId;
+      }
+    }
+
+    const bossRoom = this.rooms.find((r) => r.id === bossRoomId);
+    if (bossRoom) bossRoom.type = RoomType.BOSS;
+
+    // Random mid-depth room = TREASURE
+    const midDepthRooms = this.rooms.filter((r) => {
+      const depth = distances.get(r.id) ?? 0;
+      return depth > maxDistance * 0.3 && depth < maxDistance * 0.7;
+    });
+
+    const treasureRoom =
+      midDepthRooms.length > 0
+        ? midDepthRooms[Math.floor(this.rng.next() * midDepthRooms.length)]
+        : this.rooms[Math.min(1, this.rooms.length - 1)];
+    treasureRoom.type = RoomType.TREASURE;
+
+    // 1 room = SHOP
+    const availableRooms = this.rooms.filter(
+      (r) => r.type !== RoomType.SPAWN && r.type !== RoomType.BOSS && r.type !== RoomType.TREASURE
+    );
+    const shopRoom =
+      availableRooms.length > 0
+        ? availableRooms[Math.floor(this.rng.next() * availableRooms.length)]
+        : null;
+    if (shopRoom) shopRoom.type = RoomType.SHOP;
+
+    // 10% of rooms = ELITE
+    const eliteCount = Math.max(
+      0,
+      Math.floor((this.rooms.length * this.config.eliteRoomPercentage) / 100)
+    );
+    const eliteRoomIds: number[] = [];
+
+    const remainingRooms = this.rooms.filter(
+      (r) =>
+        r.type !== RoomType.SPAWN &&
+        r.type !== RoomType.BOSS &&
+        r.type !== RoomType.TREASURE &&
+        r.type !== RoomType.SHOP
+    );
+
+    const shuffled = this.rng.shuffle(remainingRooms);
+    for (let i = 0; i < Math.min(eliteCount, shuffled.length); i++) {
+      shuffled[i].type = RoomType.ELITE;
+      eliteRoomIds.push(shuffled[i].id);
+    }
+
+    return {
+      spawnRoomId: spawnRoom.id,
+      bossRoomId,
+      treasureRoomId: treasureRoom.id,
+      shopRoomId: shopRoom?.id ?? spawnRoom.id,
+      eliteRoomIds,
+    };
+  }
+
+  /**
+   * Compute graph distances from source room using BFS
+   */
+  private computeGraphDistances(sourceId: number): Map<number, number> {
+    const distances = new Map<number, number>();
+    const queue: number[] = [sourceId];
+    distances.set(sourceId, 0);
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      const currentDistance = distances.get(currentId) ?? 0;
+
+      const neighbors = this.graph.get(currentId) ?? [];
+      for (const neighborId of neighbors) {
+        if (!distances.has(neighborId)) {
+          distances.set(neighborId, currentDistance + 1);
+          queue.push(neighborId);
+        }
+      }
+    }
+
+    return distances;
+  }
+
+  /**
+   * Step 5: Compute room depth for difficulty scaling
+   */
+  private computeRoomDepth(spawnRoomId: number): void {
+    const distances = this.computeGraphDistances(spawnRoomId);
+
+    for (const room of this.rooms) {
+      room.depth = distances.get(room.id) ?? 0;
+    }
+  }
+
+  /**
+   * Step 6: Generate secret room connected to random corridor
+   */
+  private generateSecretRoom(): void {
+    if (this.corridors.length === 0) return;
+
+    // Pick random corridor
+    const corridor = this.corridors[Math.floor(this.rng.next() * this.corridors.length)];
+
+    // Create small secret room near corridor midpoint
+    const midX = Math.floor((corridor.x1 + corridor.x2) / 2);
+    const midY = Math.floor((corridor.y1 + corridor.y2) / 2);
+
+    const secretRoom: Room = {
+      id: this.roomIdCounter++,
+      x: midX - 3,
+      y: midY - 3,
+      width: 6,
+      height: 6,
+      centerX: midX,
+      centerY: midY,
+      type: RoomType.SECRET,
+      depth: 0,
+    };
+
+    this.rooms.push(secretRoom);
+    this.graph.set(secretRoom.id, [corridor.room1Id]);
+    this.graph.get(corridor.room1Id)?.push(secretRoom.id);
+  }
+
+  /**
+   * Get all rooms
    */
   getRooms(): Room[] {
     return this.rooms;
   }
 
   /**
-   * Get all generated corridors
-   * @returns Array of corridors
+   * Get all corridors
    */
   getCorridors(): Corridor[] {
     return this.corridors;
   }
 
   /**
-   * Get the configured corridor width
-   * @returns Corridor width in tiles
+   * Get corridor width configuration
    */
   getCorridorWidth(): number {
     return this.config.corridorWidth;
   }
 
   /**
-   * Get a random position inside a room (avoiding walls)
-   * @param room Room to get position from
-   * @param minMargin Minimum margin from walls in tiles (default: 2)
-   * @returns Position in world coordinates (pixels)
+   * Get random position inside a room (avoiding walls)
    */
   getRandomPositionInRoom(room: Room, minMargin: number = 2): { x: number; y: number } {
     const { tileSize } = GameConfig;
-    // Ensure margin doesn't consume more than 1/3 of room dimensions
-    const margin = Math.min(
-      minMargin,
-      Math.floor(room.width / RoomGenerator.MARGIN_DIVISOR),
-      Math.floor(room.height / RoomGenerator.MARGIN_DIVISOR)
-    );
+    const margin = Math.min(minMargin, Math.floor(room.width / 3), Math.floor(room.height / 3));
+
+    // Ensure valid range
+    const maxOffsetX = Math.max(0, room.width - margin * 2);
+    const maxOffsetY = Math.max(0, room.height - margin * 2);
 
     return {
-      x: (room.x + margin + Math.floor(Math.random() * (room.width - margin * 2))) * tileSize,
-      y: (room.y + margin + Math.floor(Math.random() * (room.height - margin * 2))) * tileSize,
+      x: (room.x + margin + Math.floor((this.rng?.next() ?? Math.random()) * maxOffsetX)) * tileSize,
+      y: (room.y + margin + Math.floor((this.rng?.next() ?? Math.random()) * maxOffsetY)) * tileSize,
     };
   }
 
   /**
-   * Get multiple random positions in a room
-   * Useful for spawning multiple enemies or loot items
-   * @param room Room to get positions from
-   * @param count Number of positions to generate
-   * @param minDistance Minimum distance between positions in pixels (default: 64)
-   * @returns Array of positions in world coordinates
+   * Get multiple random positions in a room with minimum distance
    */
   getMultiplePositionsInRoom(
     room: Room,
@@ -297,13 +663,12 @@ export class RoomGenerator {
     minDistance: number = 64
   ): { x: number; y: number }[] {
     const positions: { x: number; y: number }[] = [];
-    const maxAttempts = count * 10; // Prevent infinite loops
+    const maxAttempts = count * 10;
     let attempts = 0;
 
     while (positions.length < count && attempts < maxAttempts) {
       const newPos = this.getRandomPositionInRoom(room);
 
-      // Check distance from all existing positions
       let validPosition = true;
       for (const existingPos of positions) {
         const distance = Math.sqrt(
@@ -326,14 +691,7 @@ export class RoomGenerator {
   }
 
   /**
-   * Get a position in a room that is far from a given point
-   * Useful for spawning enemies away from player
-   * @param room Room to get position from
-   * @param fromX X coordinate to be far from (in pixels)
-   * @param fromY Y coordinate to be far from (in pixels)
-   * @param minDistance Minimum distance in pixels (default: 200)
-   * @param maxAttempts Maximum placement attempts (default: 20)
-   * @returns Position in world coordinates or null if no valid position found
+   * Get position far from a given point
    */
   getPositionFarFrom(
     room: Room,
@@ -342,25 +700,29 @@ export class RoomGenerator {
     minDistance: number = 200,
     maxAttempts: number = 20
   ): { x: number; y: number } | null {
+    let bestPos = this.getRandomPositionInRoom(room);
+    let bestDistance = Math.sqrt(Math.pow(bestPos.x - fromX, 2) + Math.pow(bestPos.y - fromY, 2));
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const pos = this.getRandomPositionInRoom(room);
       const distance = Math.sqrt(Math.pow(pos.x - fromX, 2) + Math.pow(pos.y - fromY, 2));
+
+      if (distance > bestDistance) {
+        bestDistance = distance;
+        bestPos = pos;
+      }
 
       if (distance >= minDistance) {
         return pos;
       }
     }
 
-    // If we can't find a position far enough, return the farthest position we can find
-    return this.getRandomPositionInRoom(room);
+    // Return best found position (may not meet minDistance requirement)
+    return bestDistance >= minDistance ? bestPos : null;
   }
 
   /**
    * Check if a tile position is a wall
-   * Considers both room walls and corridor walls
-   * @param tileX Tile x coordinate
-   * @param tileY Tile y coordinate
-   * @returns true if the tile is a wall, false otherwise
    */
   isWall(tileX: number, tileY: number): boolean {
     const halfCorridorWidth = Math.floor(this.config.corridorWidth / 2);
@@ -368,7 +730,7 @@ export class RoomGenerator {
     // Check if inside a corridor
     for (const corridor of this.corridors) {
       if (this.isInCorridor(tileX, tileY, corridor, halfCorridorWidth)) {
-        return false; // Inside corridor, not a wall
+        return false;
       }
     }
 
@@ -380,7 +742,6 @@ export class RoomGenerator {
         tileY >= room.y &&
         tileY < room.y + room.height
       ) {
-        // Inside room - check if it's a border
         const isLeftWall = tileX === room.x;
         const isRightWall = tileX === room.x + room.width - 1;
         const isTopWall = tileY === room.y;
@@ -390,17 +751,11 @@ export class RoomGenerator {
       }
     }
 
-    // Outside all rooms and corridors = wall
     return true;
   }
 
   /**
-   * Check if a tile is inside a corridor
-   * @param tileX Tile x coordinate
-   * @param tileY Tile y coordinate
-   * @param corridor Corridor to check
-   * @param halfWidth Half of corridor width
-   * @returns true if inside corridor, false otherwise
+   * Check if tile is inside corridor
    */
   private isInCorridor(
     tileX: number,
@@ -435,5 +790,19 @@ export class RoomGenerator {
     }
 
     return false;
+  }
+
+  /**
+   * Get enemy level based on room depth and difficulty scaling
+   */
+  getEnemyLevel(room: Room): number {
+    return 1 + Math.floor(room.depth * this.config.difficultyScaling);
+  }
+
+  /**
+   * Get loot rarity based on room depth (1-5 scale)
+   */
+  getLootRarity(room: Room): number {
+    return Math.min(5, 1 + Math.floor(room.depth / 2));
   }
 }

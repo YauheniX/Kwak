@@ -27,11 +27,11 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     try {
-      // Generate rooms with enhanced procedural dungeon generation
+      // Generate dungeon with graph-based procedural generation
       this.roomGenerator = new RoomGenerator();
-      const rooms = this.roomGenerator.generateRooms(GameConfig.maxRooms);
+      const dungeon = this.roomGenerator.generateDungeon();
 
-      if (rooms.length === 0) {
+      if (dungeon.rooms.length === 0) {
         console.error('No rooms generated!');
         return;
       }
@@ -39,35 +39,45 @@ export class GameScene extends Phaser.Scene {
       // Draw walls and corridors
       this.drawWalls();
 
-      // Create player in first room
-      const firstRoom = rooms[0];
-      const playerPos = this.roomGenerator.getRandomPositionInRoom(firstRoom);
+      // Get spawn room
+      const spawnRoom = dungeon.rooms.find((r) => r.id === dungeon.spawnRoomId);
+      if (!spawnRoom) {
+        console.error('Spawn room not found!');
+        return;
+      }
+
+      // Create player in spawn room
+      const playerPos = this.roomGenerator.getRandomPositionInRoom(spawnRoom);
       this.player = new Player(this, playerPos.x, playerPos.y);
 
       // Ensure at least one fragment per dungeon (distribute across rooms)
-      // Place fragments ensuring at least one fragment exists
       const fragmentCount = Math.max(1, GameConfig.fragmentsRequired);
       for (let i = 0; i < fragmentCount; i++) {
         // Distribute fragments across different rooms when possible
-        const roomIndex = i % rooms.length;
-        const room = rooms[roomIndex];
+        const roomIndex = i % dungeon.rooms.length;
+        const room = dungeon.rooms[roomIndex];
         const pos = this.roomGenerator.getRandomPositionInRoom(room);
         const fragment = new Fragment(this, pos.x, pos.y);
         this.fragments.push(fragment);
       }
 
-      // Create treasure in a different room from player when possible
-      const treasureRoomIndex =
-        rooms.length > 1 ? Math.floor(Math.random() * (rooms.length - 1)) + 1 : 0;
-      const treasureRoom = rooms[treasureRoomIndex];
-      const treasurePos = this.roomGenerator.getRandomPositionInRoom(treasureRoom);
-      this.treasure = new Treasure(this, treasurePos.x, treasurePos.y);
+      // Create treasure in treasure room
+      const treasureRoom = dungeon.rooms.find((r) => r.id === dungeon.treasureRoomId);
+      if (treasureRoom) {
+        const treasurePos = this.roomGenerator.getRandomPositionInRoom(treasureRoom);
+        this.treasure = new Treasure(this, treasurePos.x, treasurePos.y);
+      } else {
+        // Fallback to random room
+        const room = dungeon.rooms[Math.min(1, dungeon.rooms.length - 1)];
+        const treasurePos = this.roomGenerator.getRandomPositionInRoom(room);
+        this.treasure = new Treasure(this, treasurePos.x, treasurePos.y);
+      }
 
       // Create enemies with minimum distance from player spawn
-      // Skip first room to give player breathing room
-      for (let i = 1; i < rooms.length; i++) {
-        const room = rooms[i];
-        
+      // Skip spawn room to give player breathing room
+      for (const room of dungeon.rooms) {
+        if (room.id === dungeon.spawnRoomId) continue;
+
         // Support multiple spawn points per room
         const enemyCount = GameConfig.enemiesPerRoom;
         const enemyPositions = this.roomGenerator.getMultiplePositionsInRoom(
@@ -91,21 +101,6 @@ export class GameScene extends Phaser.Scene {
             const enemy = new Enemy(this, enemyPos.x, enemyPos.y);
             this.enemies.push(enemy);
           }
-        }
-      }
-
-      // If first room has multiple potential enemy positions, try spawning there too
-      // but only if positions are far from player
-      if (GameConfig.enemiesPerRoom > 0 && rooms.length === 1) {
-        const farPos = this.roomGenerator.getPositionFarFrom(
-          firstRoom,
-          playerPos.x,
-          playerPos.y,
-          200
-        );
-        if (farPos) {
-          const enemy = new Enemy(this, farPos.x, farPos.y);
-          this.enemies.push(enemy);
         }
       }
 
