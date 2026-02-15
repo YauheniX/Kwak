@@ -175,7 +175,7 @@ export class GameScene extends Phaser.Scene {
 
   private hitEnemy(): void {
     const currentTime = this.time.now;
-    
+
     // Only take damage if cooldown has passed
     if (currentTime - this.lastHitTime > this.hitCooldown) {
       this.lastHitTime = currentTime;
