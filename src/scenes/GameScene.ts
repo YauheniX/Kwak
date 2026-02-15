@@ -13,7 +13,6 @@ import { ProgressManager } from '../utils/progressManager';
 import { saveManager } from '../core/saveManager';
 import { VisualStyle } from '../config/visualStyle';
 import { progressionSystem } from '../systems/progressionSystem';
-import { SCALE_CONFIG } from '../config/scaleConfig';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -29,10 +28,26 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private interactKey!: Phaser.Input.Keyboard.Key;
   private digKeyAlt!: Phaser.Input.Keyboard.Key;
+  private attackKey!: Phaser.Input.Keyboard.Key;
   private progressManager: ProgressManager;
   private wallGraphics!: Phaser.GameObjects.Graphics;
+  private wallBodies?: Phaser.Physics.Arcade.StaticGroup;
   private lastHitTime: number = 0;
   private hitCooldown: number = 2000; // 2 second cooldown between hits
+  private lastAttackTime: number = 0;
+  private attackCooldown: number = 300;
+  private attackDamage: number = 25;
+  private attackRange: number = 80;
+  private digHoldTimer?: Phaser.Time.TimerEvent;
+  private digHoldPointerId: number | null = null;
+  private digHoldStartX: number = 0;
+  private digHoldStartY: number = 0;
+  private digHoldThresholdMs: number = 450;
+  private digHoldMoveTolerance: number = 18;
+  private digHoldIndicator?: Phaser.GameObjects.Graphics;
+  private digHoldStartTime: number = 0;
+  private digHoldFillDelayMs: number = 300;
+  private shovelMode: boolean = false;
   private collisionsEnabled: boolean = false;
   private currentLevel: number = 1;
 
@@ -43,18 +58,31 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     try {
+      // Ensure UI scene is running (e.g. when starting GameScene directly / after restarts)
+      if (!this.scene.isActive('UIScene')) {
+        this.scene.launch('UIScene');
+      }
+      this.scene.bringToTop('UIScene');
+
       // Get current dungeon level from progression system
       this.currentLevel = progressionSystem.getCurrentLevel();
       
       // Reset run state for a new run
       saveManager.resetRun();
       
-      // Setup camera bounds for responsive scaling
-      this.setupCamera();
-      
       // Generate dungeon with graph-based procedural generation
-      this.roomGenerator = new RoomGenerator();
+      // More complex labyrinth: more rooms + more loops
+      this.roomGenerator = new RoomGenerator({
+        roomCount: GameConfig.maxRooms * 2,
+        loopEdgePercentage: 40,
+        mapWidth: 120,
+        mapHeight: 120,
+      });
       const dungeon = this.roomGenerator.generateDungeon();
+
+      // Setup camera/world bounds based on dungeon size
+      const worldSize = this.roomGenerator.getWorldSizePixels();
+      this.setupCamera(worldSize.width, worldSize.height);
 
       if (dungeon.rooms.length === 0) {
         console.error('No rooms generated!');
@@ -75,6 +103,18 @@ export class GameScene extends Phaser.Scene {
       const playerPos = this.roomGenerator.getRandomPositionInRoom(spawnRoom);
       this.player = new Player(this, playerPos.x, playerPos.y);
 
+      // Default tool state: combat
+      this.setShovelMode(false);
+
+      // Camera follows the player through the dungeon
+      this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12);
+      this.cameras.main.setRoundPixels(true);
+
+      // Physics: collide player with walls
+      if (this.wallBodies) {
+        this.physics.add.collider(this.player.sprite, this.wallBodies);
+      }
+
       // Initialize enemy spawner system with level-based configuration
       this.enemySpawner = new EnemySpawner(this, this.roomGenerator, {
         dungeonLevel: this.currentLevel,
@@ -86,6 +126,13 @@ export class GameScene extends Phaser.Scene {
         playerPos,
         dungeon.spawnRoomId
       );
+
+      // Physics: collide enemies with walls
+      if (this.wallBodies) {
+        for (const enemy of this.enemies) {
+          this.physics.add.collider(enemy.sprite, this.wallBodies);
+        }
+      }
 
       // Initialize currency system from save state or default
       const runState = saveManager.getRunState();
@@ -173,12 +220,97 @@ export class GameScene extends Phaser.Scene {
       this.cursors = this.input.keyboard!.createCursorKeys();
       this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
       this.digKeyAlt = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.attackKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F);
 
-      // Setup pointer/touch input for mobile
-      this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-        // Don't process clicks on UI elements or if game is over
-        if (this.player && this.scene.isActive('GameScene')) {
+      // Pointer/touch:
+      // - tap enemy => attack
+      // - tap merchant => interact (or walk to merchant if too far)
+      // - long-press ground => dig
+      // - tap ground => move
+      this.input.on(
+        'pointerdown',
+        (pointer: Phaser.Input.Pointer, currentlyOver: Phaser.GameObjects.GameObject[]) => {
+          if (!this.player || !this.scene.isActive('GameScene')) {
+            return;
+          }
+
+          // Tap on the player toggles shovel/combat mode
+          if (currentlyOver && currentlyOver.includes(this.player.sprite)) {
+            this.setShovelMode(!this.shovelMode);
+            return;
+          }
+
+          // If pressed on an enemy, attack instead of moving
+          if (currentlyOver && currentlyOver.length > 0) {
+            const overEnemy = this.enemies.find(
+              (e) => e && !e.isDead() && currentlyOver.includes(e.sprite)
+            );
+            if (overEnemy) {
+              // In shovel mode we don't attack
+              if (!this.shovelMode) {
+                this.tryAttackEnemy(overEnemy);
+                return;
+              }
+            }
+
+            // If pressed on the merchant, interact (or walk closer)
+            if (this.merchant && currentlyOver.includes(this.merchant.sprite)) {
+              if (this.merchant.isPlayerInRange()) {
+                this.purchaseFragment();
+              } else {
+                const pos = this.merchant.getPosition();
+                this.player.setTarget(pos.x, pos.y);
+              }
+              return;
+            }
+          }
+
+          // Start long-press dig timer (ground only)
+          this.cancelDigHold();
+          this.digHoldPointerId = pointer.id;
+          this.digHoldStartX = pointer.worldX;
+          this.digHoldStartY = pointer.worldY;
+          this.digHoldStartTime = this.time.now;
+          this.startDigHoldIndicator(pointer.worldX, pointer.worldY);
+          this.digHoldTimer = this.time.delayedCall(this.digHoldThresholdMs, () => {
+            // Only dig if the same pointer is still down and hasn't moved much
+            if (!pointer.isDown || this.digHoldPointerId !== pointer.id) {
+              return;
+            }
+            const moved = Phaser.Math.Distance.Between(
+              this.digHoldStartX,
+              this.digHoldStartY,
+              pointer.worldX,
+              pointer.worldY
+            );
+            if (moved <= this.digHoldMoveTolerance) {
+              this.playDigHoldCompleteAnimation();
+              this.handleDig();
+            }
+          });
+
           this.player.setTarget(pointer.worldX, pointer.worldY);
+        }
+      );
+
+      this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+        if (this.digHoldPointerId === pointer.id) {
+          this.cancelDigHold();
+        }
+      });
+
+      this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+        if (this.digHoldPointerId !== pointer.id || !pointer.isDown) {
+          return;
+        }
+        const moved = Phaser.Math.Distance.Between(
+          this.digHoldStartX,
+          this.digHoldStartY,
+          pointer.worldX,
+          pointer.worldY
+        );
+        if (moved > this.digHoldMoveTolerance) {
+          this.cancelDigHold();
         }
       });
 
@@ -187,6 +319,7 @@ export class GameScene extends Phaser.Scene {
 
       // Give player initial invulnerability
       this.lastHitTime = this.time.now;
+      this.lastAttackTime = this.time.now;
 
       // Enable collisions after a short delay
       this.time.delayedCall(500, () => {
@@ -203,88 +336,48 @@ export class GameScene extends Phaser.Scene {
   /**
    * Setup camera with proper bounds for responsive scaling
    */
-  private setupCamera(): void {
-    // Set camera bounds based on the world size
-    // The camera will follow the player within these bounds
-    const worldWidth = SCALE_CONFIG.baseWidth * 2;
-    const worldHeight = SCALE_CONFIG.baseHeight * 2;
-    
+  private setupCamera(worldWidth: number, worldHeight: number): void {
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
   }
 
   private drawWalls(): void {
+    if (this.wallGraphics) {
+      this.wallGraphics.destroy();
+    }
+
     this.wallGraphics = this.add.graphics();
     this.wallGraphics.fillStyle(VisualStyle.ColorNumbers.wallColor, 1);
 
-    const { tileSize } = GameConfig;
-    const rooms = this.roomGenerator.getRooms();
-    const corridors = this.roomGenerator.getCorridors();
-
-    // Draw room walls
-    for (const room of rooms) {
-      for (let x = room.x; x < room.x + room.width; x++) {
-        for (let y = room.y; y < room.y + room.height; y++) {
-          if (this.roomGenerator.isWall(x, y)) {
-            this.wallGraphics.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
-          }
-        }
-      }
+    // Clear previous wall colliders
+    if (this.wallBodies) {
+      this.wallBodies.clear(true, true);
     }
+    this.wallBodies = this.physics.add.staticGroup();
 
-    // Draw corridor walls
-    // Corridors are included in the isWall check, but we need to draw their borders
-    const corridorWidth = this.roomGenerator.getCorridorWidth();
-    const halfWidth = Math.floor(corridorWidth / 2);
-    
-    for (const corridor of corridors) {
-      const { x1, y1, x2, y2 } = corridor;
+    const { tileSize } = GameConfig;
+    const { width: mapWidth, height: mapHeight } = this.roomGenerator.getMapSizeTiles();
 
-      // Horizontal corridor
-      if (y1 === y2) {
-        const minX = Math.min(x1, x2);
-        const maxX = Math.max(x1, x2);
-        
-        // Draw top and bottom walls
-        for (let x = minX; x <= maxX; x++) {
-          // Top wall
-          this.wallGraphics.fillRect(
-            x * tileSize,
-            (y1 - halfWidth - 1) * tileSize,
-            tileSize,
-            tileSize
-          );
-          // Bottom wall
-          this.wallGraphics.fillRect(
-            x * tileSize,
-            (y1 + halfWidth + 1) * tileSize,
-            tileSize,
-            tileSize
-          );
+    // Render + build physics for every wall tile so visuals match collisions
+    for (let x = 0; x < mapWidth; x++) {
+      for (let y = 0; y < mapHeight; y++) {
+        if (!this.roomGenerator.isWall(x, y)) {
+          continue;
         }
-      }
-      // Vertical corridor
-      else if (x1 === x2) {
-        const minY = Math.min(y1, y2);
-        const maxY = Math.max(y1, y2);
-        
-        // Draw left and right walls
-        for (let y = minY; y <= maxY; y++) {
-          // Left wall
-          this.wallGraphics.fillRect(
-            (x1 - halfWidth - 1) * tileSize,
-            y * tileSize,
-            tileSize,
-            tileSize
-          );
-          // Right wall
-          this.wallGraphics.fillRect(
-            (x1 + halfWidth + 1) * tileSize,
-            y * tileSize,
-            tileSize,
-            tileSize
-          );
-        }
+
+        this.wallGraphics.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+
+        const wallRect = this.add.rectangle(
+          x * tileSize + tileSize / 2,
+          y * tileSize + tileSize / 2,
+          tileSize,
+          tileSize,
+          0x000000,
+          0
+        );
+
+        this.physics.add.existing(wallRect, true);
+        this.wallBodies.add(wallRect);
       }
     }
   }
@@ -620,6 +713,135 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private tryAttackEnemy(enemy: Enemy): void {
+    if (this.shovelMode) return;
+    if (!enemy || enemy.isDead()) return;
+
+    const currentTime = this.time.now;
+    if (currentTime - this.lastAttackTime < this.attackCooldown) {
+      return;
+    }
+
+    // Range check
+    const distance = Phaser.Math.Distance.Between(
+      this.player.sprite.x,
+      this.player.sprite.y,
+      enemy.sprite.x,
+      enemy.sprite.y
+    );
+    if (distance > this.attackRange) {
+      return;
+    }
+
+    this.lastAttackTime = currentTime;
+    const killed = enemy.takeDamage(this.attackDamage);
+    if (killed) {
+      this.cleanupDeadEnemies();
+    }
+  }
+
+  private tryAttackNearestEnemy(): void {
+    if (this.shovelMode) return;
+    if (!this.enemies.length) return;
+
+    let nearest: Enemy | undefined;
+    let nearestDistance = Infinity;
+
+    for (const enemy of this.enemies) {
+      if (!enemy || enemy.isDead()) continue;
+      const distance = Phaser.Math.Distance.Between(
+        this.player.sprite.x,
+        this.player.sprite.y,
+        enemy.sprite.x,
+        enemy.sprite.y
+      );
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = enemy;
+      }
+    }
+
+    if (nearest && nearestDistance <= this.attackRange) {
+      this.tryAttackEnemy(nearest);
+    }
+  }
+
+  private cleanupDeadEnemies(): void {
+    this.enemies = this.enemies.filter((e) => e && !e.isDead());
+  }
+
+  private setShovelMode(enabled: boolean): void {
+    this.shovelMode = enabled;
+    // Visual feedback: change player color while holding the shovel
+    const color = enabled ? VisualStyle.ColorNumbers.treasureGold : GameConfig.playerColor;
+    this.player.sprite.setFillStyle(color, 1);
+  }
+
+  private cancelDigHold(): void {
+    this.digHoldPointerId = null;
+    this.digHoldStartTime = 0;
+    if (this.digHoldTimer) {
+      this.digHoldTimer.remove(false);
+      this.digHoldTimer = undefined;
+    }
+
+    if (this.digHoldIndicator) {
+      this.digHoldIndicator.destroy();
+      this.digHoldIndicator = undefined;
+    }
+  }
+
+  private startDigHoldIndicator(x: number, y: number): void {
+    if (this.digHoldIndicator) {
+      this.digHoldIndicator.destroy();
+    }
+
+    this.digHoldIndicator = this.add.graphics();
+    this.digHoldIndicator.setDepth(999);
+    this.digHoldIndicator.setAlpha(0.9);
+
+    // Draw once immediately (progress will be updated each frame)
+    this.drawDigHoldIndicator(x, y, 0);
+  }
+
+  private drawDigHoldIndicator(x: number, y: number, progress01: number): void {
+    if (!this.digHoldIndicator) return;
+
+    const radius = 22;
+    const thickness = 3;
+
+    this.digHoldIndicator.clear();
+
+    // Background ring
+    this.digHoldIndicator.lineStyle(thickness, VisualStyle.ColorNumbers.darkWoodBrown, 0.6);
+    this.digHoldIndicator.strokeCircle(x, y, radius);
+
+    // Progress arc
+    const clamped = Phaser.Math.Clamp(progress01, 0, 1);
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + Math.PI * 2 * clamped;
+    this.digHoldIndicator.lineStyle(thickness, VisualStyle.ColorNumbers.treasureGold, 1);
+    this.digHoldIndicator.beginPath();
+    this.digHoldIndicator.arc(x, y, radius, startAngle, endAngle, false);
+    this.digHoldIndicator.strokePath();
+  }
+
+  private playDigHoldCompleteAnimation(): void {
+    if (!this.digHoldIndicator) return;
+
+    // Quick pulse + fade out
+    this.tweens.add({
+      targets: this.digHoldIndicator,
+      alpha: 0,
+      duration: 180,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.digHoldIndicator?.destroy();
+        this.digHoldIndicator = undefined;
+      },
+    });
+  }
+
   private emitGameState(): void {
     this.events.emit('updateUI', {
       health: this.player.health,
@@ -638,6 +860,14 @@ export class GameScene extends Phaser.Scene {
     // Get player position once for this update cycle
     const playerPos = this.player.getPosition();
 
+    // Update dig-hold indicator progress (touch UX)
+    if (this.digHoldPointerId !== null && this.digHoldIndicator) {
+      const elapsed = this.time.now - this.digHoldStartTime;
+      const fillDuration = Math.max(1, this.digHoldThresholdMs - this.digHoldFillDelayMs);
+      const progress = elapsed < this.digHoldFillDelayMs ? 0 : (elapsed - this.digHoldFillDelayMs) / fillDuration;
+      this.drawDigHoldIndicator(this.digHoldStartX, this.digHoldStartY, progress);
+    }
+
     // Handle E key and Space key
     const nearMerchant = this.merchant && this.merchant.isPlayerInRange();
     
@@ -653,6 +883,11 @@ export class GameScene extends Phaser.Scene {
     // Space key: always dig (no merchant interaction)
     if (Phaser.Input.Keyboard.JustDown(this.digKeyAlt)) {
       this.handleDig();
+    }
+
+    // F key: attack nearest enemy in range
+    if (Phaser.Input.Keyboard.JustDown(this.attackKey)) {
+      this.tryAttackNearestEnemy();
     }
 
     // Update merchant if exists
@@ -673,11 +908,17 @@ export class GameScene extends Phaser.Scene {
           enemy.sprite.y
         );
 
-        // Hit if within combined radius
+        // Contact combat: enemy hurts player; player can also damage enemy on contact
         if (distance < GameConfig.playerSize + GameConfig.enemySize) {
           this.hitEnemy();
+          if (!this.shovelMode) {
+            this.tryAttackEnemy(enemy);
+          }
         }
       }
     });
+
+    // Remove killed enemies from list
+    this.cleanupDeadEnemies();
   }
 }

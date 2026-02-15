@@ -5,13 +5,15 @@ import Phaser from 'phaser';
  */
 export class Merchant {
   public sprite: Phaser.GameObjects.Arc;
-  public interactionRadius: number = 64;
+  public interactionRadius: number = 96;
   private promptText?: Phaser.GameObjects.Text;
   private isPlayerNearby: boolean = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     // Create merchant sprite (purple/magenta circle for now - easy to replace with sprite)
     this.sprite = scene.add.circle(x, y, 20, 0xff00ff);
+    // Enable tap/click interaction on mobile/desktop
+    this.sprite.setInteractive();
     scene.physics.add.existing(this.sprite, true); // static body
     
     // Add a visual indicator (star or crown effect)
@@ -25,7 +27,7 @@ export class Merchant {
     });
 
     // Create interaction prompt (hidden by default)
-    this.promptText = scene.add.text(x, y + 35, 'Press E to interact', {
+    this.promptText = scene.add.text(x, y + 35, 'Tap (or E) to interact', {
       fontSize: '12px',
       color: '#ffffff',
       backgroundColor: '#000000',

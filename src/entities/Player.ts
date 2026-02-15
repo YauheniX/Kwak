@@ -9,6 +9,8 @@ export class Player {
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.sprite = scene.add.circle(x, y, GameConfig.playerSize, GameConfig.playerColor);
+    // Enable tap/click on player (used to toggle tools like the shovel)
+    this.sprite.setInteractive();
     scene.physics.add.existing(this.sprite);
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     body.setCollideWorldBounds(true);

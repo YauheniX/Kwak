@@ -37,7 +37,7 @@ export class MenuScene extends Phaser.Scene {
     const instructions = this.add.text(
       width / 2,
       height / 2,
-      'Collect all map fragments to unlock the treasure!\n\nArrow keys or Click/Touch to move\nAvoid enemies\n\nClick to Start',
+      'Collect all map fragments to unlock the treasure!\n\nArrow keys or Tap to move\nTap enemy to attack\nTap merchant to interact (or walk closer)\nLong-press to dig\nAvoid enemies\n\nTap to Start',
       {
         fontSize: `${VisualStyle.Typography.fontSize.large}px`,
         color: VisualStyle.Colors.sandBeige,

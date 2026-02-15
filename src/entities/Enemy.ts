@@ -56,6 +56,9 @@ export class Enemy {
     
     // Create sprite with type-specific appearance
     this.sprite = scene.add.circle(x, y, stats.size, stats.color);
+    // Enable click/tap interactions (used for attacking on mobile/desktop)
+    // Default hit area from the shape bounds is sufficient and reliable.
+    this.sprite.setInteractive();
     scene.physics.add.existing(this.sprite);
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     body.setCollideWorldBounds(true);

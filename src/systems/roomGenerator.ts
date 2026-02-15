@@ -638,6 +638,27 @@ export class RoomGenerator {
   }
 
   /**
+   * Get map dimensions in tiles
+   */
+  getMapSizeTiles(): { width: number; height: number } {
+    return {
+      width: this.config.mapWidth,
+      height: this.config.mapHeight,
+    };
+  }
+
+  /**
+   * Get world dimensions in pixels
+   */
+  getWorldSizePixels(): { width: number; height: number } {
+    const { tileSize } = GameConfig;
+    return {
+      width: this.config.mapWidth * tileSize,
+      height: this.config.mapHeight * tileSize,
+    };
+  }
+
+  /**
    * Get random position inside a room (avoiding walls)
    */
   getRandomPositionInRoom(room: Room, minMargin: number = 2): { x: number; y: number } {
