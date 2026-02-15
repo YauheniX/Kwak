@@ -25,3 +25,9 @@ npm-debug.log*
 # Environment
 .env
 .env.local
+
+# Capacitor
+android
+ios
+capacitor.config.ts
+capacitor.config.json
