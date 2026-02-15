@@ -297,11 +297,13 @@ export class SaveManager {
    * Add gold to current run
    */
   addGold(amount: number): void {
-    if (amount > 0) {
-      this.updateRunState({
-        gold: this.runState.gold + amount,
-      });
+    if (amount <= 0) {
+      console.warn('addGold called with non-positive amount:', amount);
+      return;
     }
+    this.updateRunState({
+      gold: this.runState.gold + amount,
+    });
   }
 
   /**
@@ -310,7 +312,8 @@ export class SaveManager {
    */
   removeGold(amount: number): boolean {
     if (amount <= 0) {
-      throw new Error('Amount must be positive');
+      console.warn('removeGold called with non-positive amount:', amount);
+      return false;
     }
     if (this.runState.gold < amount) {
       return false;
