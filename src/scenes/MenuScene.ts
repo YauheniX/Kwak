@@ -60,9 +60,8 @@ export class MenuScene extends Phaser.Scene {
       
       // Lazy-load GameScene and UIScene if not already loaded
       // This ensures they're available before we start them
-      const sceneManager = (window as any).sceneManager;
-      if (sceneManager) {
-        sceneManager.preloadScenes(['GameScene', 'UIScene']).then(() => {
+      if (window.sceneManager) {
+        window.sceneManager.preloadScenes(['GameScene', 'UIScene']).then(() => {
           this.scene.start('GameScene');
           this.scene.launch('UIScene');
         });

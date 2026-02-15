@@ -8,6 +8,14 @@ import { GameConfig } from './config/gameConfig';
  * This creates separate chunks for each scene, improving load time and caching.
  */
 
+// Extend Window interface for type safety
+declare global {
+  interface Window {
+    game: Phaser.Game;
+    sceneManager: SceneManager;
+  }
+}
+
 // Scene loader registry - maps scene keys to their dynamic import functions
 const sceneLoaders: Record<string, () => Promise<new () => Phaser.Scene>> = {
   BootScene: async () => {
@@ -69,6 +77,7 @@ class SceneManager {
       this.game.scene.add(sceneKey, SceneClass, false);
       this.loadedScenes.add(sceneKey);
       
+      // Development logging (removed by Terser in production)
       console.log(`Lazy-loaded scene: ${sceneKey}`);
     } catch (error) {
       console.error(`Failed to load scene ${sceneKey}:`, error);
@@ -119,6 +128,6 @@ const sceneManager = new SceneManager(game);
 
 // Expose game instance and scene manager for debugging and scene transitions
 if (typeof window !== 'undefined') {
-  (window as any).game = game;
-  (window as any).sceneManager = sceneManager;
+  window.game = game;
+  window.sceneManager = sceneManager;
 }

@@ -37,6 +37,8 @@ export default defineConfig({
           if (id.includes('/src/entities/')) {
             return 'entities';
           }
+          // Return undefined to let Vite handle default chunking for remaining files
+          return undefined;
         },
         // Optimize chunk file names for better caching
         chunkFileNames: 'assets/[name]-[hash].js',

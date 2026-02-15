@@ -181,9 +181,8 @@ export class GameScene extends Phaser.Scene {
       this.scene.stop('UIScene');
       
       // Ensure GameOverScene is loaded before starting it
-      const sceneManager = (window as any).sceneManager;
-      if (sceneManager) {
-        sceneManager.loadScene('GameOverScene').then(() => {
+      if (window.sceneManager) {
+        window.sceneManager.loadScene('GameOverScene').then(() => {
           this.scene.start('GameOverScene', { won: true, fragments: this.fragmentsCollected });
         });
       } else {
@@ -216,9 +215,8 @@ export class GameScene extends Phaser.Scene {
         this.scene.stop('UIScene');
         
         // Ensure GameOverScene is loaded before starting it
-        const sceneManager = (window as any).sceneManager;
-        if (sceneManager) {
-          sceneManager.loadScene('GameOverScene').then(() => {
+        if (window.sceneManager) {
+          window.sceneManager.loadScene('GameOverScene').then(() => {
             this.scene.start('GameOverScene', {
               won: false,
               fragments: this.fragmentsCollected,
