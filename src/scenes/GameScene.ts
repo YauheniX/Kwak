@@ -3,6 +3,7 @@ import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { Fragment, Treasure } from '../entities/Collectible';
 import { RoomGenerator } from '../systems/roomGenerator';
+import { EnemySpawner } from '../systems/enemySpawner';
 import { GameConfig } from '../config/gameConfig';
 import { ProgressManager } from '../utils/progressManager';
 
@@ -12,6 +13,7 @@ export class GameScene extends Phaser.Scene {
   private fragments: Fragment[] = [];
   private treasure!: Treasure;
   private roomGenerator!: RoomGenerator;
+  private enemySpawner!: EnemySpawner;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private fragmentsCollected: number = 0;
   private progressManager: ProgressManager;
@@ -50,6 +52,16 @@ export class GameScene extends Phaser.Scene {
       const playerPos = this.roomGenerator.getRandomPositionInRoom(spawnRoom);
       this.player = new Player(this, playerPos.x, playerPos.y);
 
+      // Initialize enemy spawner system
+      this.enemySpawner = new EnemySpawner(this, this.roomGenerator);
+
+      // Spawn enemies using the modular system
+      this.enemies = this.enemySpawner.spawnEnemies(
+        dungeon.rooms,
+        playerPos,
+        dungeon.spawnRoomId
+      );
+
       // Ensure at least one fragment per dungeon (distribute across rooms)
       const fragmentCount = Math.max(1, GameConfig.fragmentsRequired);
       for (let i = 0; i < fragmentCount; i++) {
@@ -71,37 +83,6 @@ export class GameScene extends Phaser.Scene {
         const room = dungeon.rooms[Math.min(1, dungeon.rooms.length - 1)];
         const treasurePos = this.roomGenerator.getRandomPositionInRoom(room);
         this.treasure = new Treasure(this, treasurePos.x, treasurePos.y);
-      }
-
-      // Create enemies with minimum distance from player spawn
-      // Skip spawn room to give player breathing room
-      for (const room of dungeon.rooms) {
-        if (room.id === dungeon.spawnRoomId) continue;
-
-        // Support multiple spawn points per room
-        const enemyCount = GameConfig.enemiesPerRoom;
-        const enemyPositions = this.roomGenerator.getMultiplePositionsInRoom(
-          room,
-          enemyCount,
-          64 // Minimum 64 pixels between enemies
-        );
-
-        // Create enemies at calculated positions
-        for (const enemyPos of enemyPositions) {
-          // Ensure minimum distance from player spawn
-          const distanceToPlayer = Phaser.Math.Distance.Between(
-            playerPos.x,
-            playerPos.y,
-            enemyPos.x,
-            enemyPos.y
-          );
-
-          // Only create enemy if far enough from player (200+ pixels)
-          if (distanceToPlayer >= 200) {
-            const enemy = new Enemy(this, enemyPos.x, enemyPos.y);
-            this.enemies.push(enemy);
-          }
-        }
       }
 
       // Setup input
