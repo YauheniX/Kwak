@@ -155,7 +155,7 @@ function handleRunCompletion(
   progression.updateMetrics({
     currentGold: progressionMetrics.currentGold + rewards.gold,
     totalFragmentsCollected: progressionMetrics.totalFragmentsCollected + fragmentsCollected,
-  });
+  }, metaState.gamesPlayed);
   
   // Check for fragment unlock
   if (Math.random() < rewards.fragmentUnlockChance) {

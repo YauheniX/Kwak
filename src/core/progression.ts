@@ -313,17 +313,16 @@ export class ProgressionSystem {
    * Use for tracking fragments collected, gold spent, etc.
    * 
    * @param updates - Partial metrics to update
+   * @param gamesPlayed - Optional: Total games played for accurate fragment rate calculation
    * 
    * Extension: Add validation or triggers for specific updates
    * Example: Check for achievement unlocks when updating metrics
    */
-  updateMetrics(updates: Partial<ProgressionMetrics>): void {
+  updateMetrics(updates: Partial<ProgressionMetrics>, gamesPlayed?: number): void {
     this.metrics = { ...this.metrics, ...updates };
     
-    // Recalculate fragment collection rate
-    if (updates.totalFragmentsCollected !== undefined) {
-      const gamesPlayed = this.metrics.totalGoldEarned > 0 ? 
-        Math.max(1, Math.floor(this.metrics.totalGoldEarned / 100)) : 1;
+    // Recalculate fragment collection rate if fragments were updated
+    if (updates.totalFragmentsCollected !== undefined && gamesPlayed !== undefined && gamesPlayed > 0) {
       this.metrics.fragmentCollectionRate = 
         this.metrics.totalFragmentsCollected / gamesPlayed;
     }
@@ -553,10 +552,12 @@ export function estimateDifficultyTier(
 /**
  * Get a formatted difficulty name for display
  * 
- * @param tier - Difficulty tier (1-5)
+ * @param tier - Difficulty tier (1-5, values outside this range are clamped)
  * @returns Human-readable difficulty name
  */
 export function getDifficultyName(tier: number): string {
   const names = ['Easy', 'Normal', 'Hard', 'Very Hard', 'Extreme'];
-  return names[Math.max(0, Math.min(4, tier - 1))];
+  // Clamp tier to valid range (1-5) to prevent invalid array access
+  const clampedTier = Math.max(1, Math.min(5, tier));
+  return names[clampedTier - 1];
 }
