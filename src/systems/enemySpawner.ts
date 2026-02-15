@@ -49,7 +49,8 @@ export class EnemySpawner {
 
     // Register default enemy type
     this.registerEnemyType('default', {
-      createEnemy: (scene: Phaser.Scene, x: number, y: number) => new Enemy(scene, x, y),
+      createEnemy: (scene: Phaser.Scene, x: number, y: number) => 
+        new Enemy(scene, x, y, GameConfig.enemyAI),
       weight: 1,
     });
   }
@@ -131,13 +132,14 @@ export class EnemySpawner {
 
   /**
    * Calculate number of enemies to spawn in a room based on depth
+   * Returns 0-maxEnemiesPerRoom based on randomization and depth
    */
   private calculateEnemyCount(room: Room): number {
-    // Base count from configuration
-    let count = Math.floor(Math.random() * this.config.maxEnemiesPerRoom) + 1;
+    // Random count from 0 to maxEnemiesPerRoom
+    let count = Math.floor(Math.random() * (this.config.maxEnemiesPerRoom + 1));
 
-    // Scale with room depth (higher depth = more enemies)
-    if (room.depth > 2) {
+    // Scale with room depth (higher depth = more likely to have max enemies)
+    if (room.depth > 2 && count > 0) {
       count = Math.min(this.config.maxEnemiesPerRoom, count + 1);
     }
 

@@ -19,6 +19,7 @@ export const GameConfig = {
   enemySpeed: 100,
   enemySize: 14,
   enemyColor: 0xff0000,
+  // Deprecated: Use enemySpawn.maxEnemiesPerRoom instead
   enemiesPerRoom: 1, // Number of enemies per room (supports multiple spawn points)
   
   // Enemy spawn configuration
