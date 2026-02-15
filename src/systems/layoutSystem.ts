@@ -74,6 +74,7 @@ export class LayoutSystem {
     const fragmentTrackerPos = getAnchoredPosition('top-right', 0, 0, width, height);
 
     // Fragment indicators - top-right, below fragment tracker
+    // Using SPACING.fragmentIndicator for consistent spacing between indicators
     const fragmentIndicatorsStartPos = getAnchoredPosition(
       'top-right',
       0,
@@ -108,7 +109,7 @@ export class LayoutSystem {
       fragmentIndicators: {
         startX: fragmentIndicatorsStartPos.x,
         startY: fragmentIndicatorsStartPos.y,
-        spacing: 20, // Spacing between fragment indicators
+        spacing: SPACING.fragmentIndicator,
       },
       joystick: { ...joystickPos, size: touchControlSize },
       actionButton: { ...actionButtonPos, size: touchControlSize },

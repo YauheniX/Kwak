@@ -146,6 +146,8 @@ export const SPACING = {
   xl: 40,
   xxl: 48,
   xxxl: 64,
+  // Fragment-specific spacing
+  fragmentIndicator: 20,
 } as const;
 
 /**
@@ -167,10 +169,10 @@ export type AnchorPosition =
  * This is the primary helper for responsive UI positioning
  * 
  * @param anchor - The anchor position (e.g., 'top-left', 'bottom-right')
- * @param offsetX - Optional horizontal offset from anchor point
- * @param offsetY - Optional vertical offset from anchor point
- * @param width - Optional width for calculating centered positions
- * @param height - Optional height for calculating centered positions
+ * @param offsetX - Horizontal offset from anchor point (default: 0)
+ * @param offsetY - Vertical offset from anchor point (default: 0)
+ * @param width - Current viewport width (default: base width). Pass this.cameras.main.width from scenes.
+ * @param height - Current viewport height (default: base height). Pass this.cameras.main.height from scenes.
  * @returns Position object with x and y coordinates
  */
 export function getAnchoredPosition(

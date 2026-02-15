@@ -13,6 +13,7 @@ export class UIScene extends Phaser.Scene {
   private levelText!: Phaser.GameObjects.Text;
   private fragmentIndicators: Phaser.GameObjects.Container[] = [];
   private maxHealth: number = 1000;
+  private currentHealth: number = 1000;
   private layoutSystem!: LayoutSystem;
 
   constructor() {
@@ -134,11 +135,8 @@ export class UIScene extends Phaser.Scene {
     // Reposition fragment tracker
     this.fragmentText.setPosition(layout.fragmentTracker.x, layout.fragmentTracker.y);
 
-    // Force redraw health bar with current health
-    this.updateHealthBar(
-      parseInt(this.healthText.text.replace('Health: ', '')) || this.maxHealth,
-      this.maxHealth
-    );
+    // Force redraw health bar with stored current health
+    this.updateHealthBar(this.currentHealth, this.maxHealth);
   }
 
   private updateUI(data: {
@@ -157,6 +155,9 @@ export class UIScene extends Phaser.Scene {
     if (data.level !== undefined) {
       this.levelText.setText(`Level: ${data.level}`);
     }
+
+    // Store current health for resize events
+    this.currentHealth = data.health;
 
     // Update health bar
     this.updateHealthBar(data.health, this.maxHealth);
