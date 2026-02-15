@@ -9,6 +9,7 @@ import { CurrencySystem } from '../systems/currency';
 import { Merchant } from '../entities/Merchant';
 import { GameConfig } from '../config/gameConfig';
 import { ProgressManager } from '../utils/progressManager';
+import { saveManager } from '../core/saveManager';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -34,6 +35,9 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     try {
+      // Reset run state for a new run
+      saveManager.resetRun();
+      
       // Generate dungeon with graph-based procedural generation
       this.roomGenerator = new RoomGenerator();
       const dungeon = this.roomGenerator.generateDungeon();
@@ -67,8 +71,9 @@ export class GameScene extends Phaser.Scene {
         dungeon.spawnRoomId
       );
 
-      // Initialize currency system (starting with some gold)
-      this.currencySystem = new CurrencySystem(150);
+      // Initialize currency system from save state or default
+      const runState = saveManager.getRunState();
+      this.currencySystem = new CurrencySystem(runState.gold);
 
       // Initialize map fragment system
       this.mapFragmentSystem = new MapFragmentSystem({
@@ -83,6 +88,11 @@ export class GameScene extends Phaser.Scene {
         dungeon.rooms,
         dungeon.shopRoomId
       );
+
+      // Save total fragments to run state
+      saveManager.updateRunState({
+        totalFragmentsInRun: fragmentData.length,
+      });
 
       // Place fragments in rooms
       for (const fragment of fragmentData) {
@@ -264,6 +274,9 @@ export class GameScene extends Phaser.Scene {
 
   private collectFragment(fragmentId: number): void {
     if (this.mapFragmentSystem.collectFragment(fragmentId)) {
+      // Save collected fragment to run state
+      saveManager.collectFragment(fragmentId);
+      
       this.emitGameState();
 
       // Check if all fragments collected
@@ -316,7 +329,11 @@ export class GameScene extends Phaser.Scene {
     // Purchase the fragment
     const result = this.mapFragmentSystem.purchaseFragment(fragment.id);
     if (result.success) {
+      // Remove gold from both systems
       this.currencySystem.removeGold(result.cost);
+      saveManager.removeGold(result.cost);
+      saveManager.collectFragment(fragment.id);
+      
       this.emitGameState();
 
       // Show purchase confirmation
