@@ -8,7 +8,7 @@ export const GameConfig = {
   roomWidth: 20,
   roomHeight: 15,
   tileSize: 32,
-  maxRooms: 10,
+  maxRooms: 5, // Reduced from 10 to 5
 
   // Player
   playerSpeed: 200,
@@ -19,7 +19,7 @@ export const GameConfig = {
   enemySpeed: 100,
   enemySize: 14,
   enemyColor: 0xff0000,
-  enemiesPerRoom: 3,
+  enemiesPerRoom: 1, // Reduced from 3 to 1
 
   // Fragments & Treasure
   fragmentsRequired: 4, // 3-5 range, using 4

@@ -23,4 +23,9 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, PreloadScene, MenuScene, GameScene, UIScene, GameOverScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Expose game instance for debugging
+if (typeof window !== 'undefined') {
+  (window as any).game = game;
+}

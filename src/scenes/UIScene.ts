@@ -13,7 +13,7 @@ export class UIScene extends Phaser.Scene {
     const { width } = this.cameras.main;
 
     // Health display
-    this.healthText = this.add.text(10, 10, 'Health: 100', {
+    this.healthText = this.add.text(10, 10, 'Health: 1000', {
       fontSize: `${GameConfig.fontSize}px`,
       color: GameConfig.uiFontColor,
       backgroundColor: '#000000',

@@ -3,7 +3,7 @@ import { GameConfig } from '../config/gameConfig';
 
 export class Player {
   public sprite: Phaser.GameObjects.Arc;
-  public health: number = 100;
+  public health: number = 1000; // Much higher health for easier gameplay
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.sprite = scene.add.circle(x, y, GameConfig.playerSize, GameConfig.playerColor);
