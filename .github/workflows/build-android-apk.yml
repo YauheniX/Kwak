@@ -40,10 +40,10 @@ jobs:
       - name: Build project
         run: npm run build
 
-      # Step 5: Install Capacitor CLI globally
+      # Step 5: Install Capacitor packages locally
       # Capacitor is used to wrap the web app for Android
-      - name: Install Capacitor CLI
-        run: npm install -g @capacitor/cli @capacitor/core @capacitor/android
+      - name: Install Capacitor packages
+        run: npm install @capacitor/cli @capacitor/core @capacitor/android
 
       # Step 6: Initialize Capacitor if not already initialized
       # This creates capacitor.config.ts and sets up the project
