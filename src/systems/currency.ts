@@ -32,9 +32,14 @@ export class CurrencySystem {
 
   /**
    * Remove gold (for purchases)
+   * @returns true if successful, false if insufficient funds
+   * @throws Error if amount is invalid (non-positive)
    */
   removeGold(amount: number): boolean {
-    if (amount <= 0 || this.gold < amount) {
+    if (amount <= 0) {
+      throw new Error('Amount must be positive');
+    }
+    if (this.gold < amount) {
       return false;
     }
     this.gold -= amount;

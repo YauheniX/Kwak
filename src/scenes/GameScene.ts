@@ -4,7 +4,7 @@ import { Enemy } from '../entities/Enemy';
 import { Treasure } from '../entities/Collectible';
 import { RoomGenerator } from '../systems/roomGenerator';
 import { EnemySpawner } from '../systems/enemySpawner';
-import { MapFragmentSystem } from '../systems/mapFragment';
+import { MapFragmentSystem, FragmentState, FragmentLocationType } from '../systems/mapFragment';
 import { CurrencySystem } from '../systems/currency';
 import { Merchant } from '../entities/Merchant';
 import { GameConfig } from '../config/gameConfig';
@@ -86,7 +86,7 @@ export class GameScene extends Phaser.Scene {
 
       // Place fragments in rooms
       for (const fragment of fragmentData) {
-        if (fragment.locationType === 'ROOM' && fragment.roomId !== undefined) {
+        if (fragment.locationType === FragmentLocationType.ROOM && fragment.roomId !== undefined) {
           const room = dungeon.rooms.find(r => r.id === fragment.roomId);
           if (room) {
             const pos = this.roomGenerator.getRandomPositionInRoom(room);
@@ -239,7 +239,7 @@ export class GameScene extends Phaser.Scene {
     const fragmentSprites = this.mapFragmentSystem.getFragments();
     fragmentSprites.forEach((fragmentData) => {
       const sprite = this.mapFragmentSystem.getFragmentSprite(fragmentData.id);
-      if (sprite && fragmentData.state === 'UNCOLLECTED') {
+      if (sprite && fragmentData.state === FragmentState.UNCOLLECTED) {
         this.physics.add.overlap(
           this.player.sprite,
           sprite.sprite,
@@ -284,7 +284,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const fragment = merchantFragments[0];
-    if (fragment.state !== 'AVAILABLE_FOR_PURCHASE') {
+    if (fragment.state !== FragmentState.AVAILABLE_FOR_PURCHASE) {
       return;
     }
 
