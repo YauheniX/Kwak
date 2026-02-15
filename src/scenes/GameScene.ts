@@ -176,10 +176,19 @@ export class GameScene extends Phaser.Scene {
 
   private collectTreasure(): void {
     if (!this.treasure.isLocked()) {
-      // Win!
+      // Win! Lazy-load GameOverScene before transitioning
       this.progressManager.recordGameWon(this.fragmentsCollected);
       this.scene.stop('UIScene');
-      this.scene.start('GameOverScene', { won: true, fragments: this.fragmentsCollected });
+      
+      // Ensure GameOverScene is loaded before starting it
+      const sceneManager = (window as any).sceneManager;
+      if (sceneManager) {
+        sceneManager.loadScene('GameOverScene').then(() => {
+          this.scene.start('GameOverScene', { won: true, fragments: this.fragmentsCollected });
+        });
+      } else {
+        this.scene.start('GameOverScene', { won: true, fragments: this.fragmentsCollected });
+      }
     }
   }
 
@@ -202,13 +211,25 @@ export class GameScene extends Phaser.Scene {
       });
 
       if (this.player.health <= 0) {
-        // Game over
+        // Game over - lazy-load GameOverScene before transitioning
         this.progressManager.recordGameLost(this.fragmentsCollected);
         this.scene.stop('UIScene');
-        this.scene.start('GameOverScene', {
-          won: false,
-          fragments: this.fragmentsCollected,
-        });
+        
+        // Ensure GameOverScene is loaded before starting it
+        const sceneManager = (window as any).sceneManager;
+        if (sceneManager) {
+          sceneManager.loadScene('GameOverScene').then(() => {
+            this.scene.start('GameOverScene', {
+              won: false,
+              fragments: this.fragmentsCollected,
+            });
+          });
+        } else {
+          this.scene.start('GameOverScene', {
+            won: false,
+            fragments: this.fragmentsCollected,
+          });
+        }
       }
     }
   }

@@ -54,11 +54,23 @@ export class MenuScene extends Phaser.Scene {
     );
     stats.setOrigin(0.5);
 
-    // Click to start
+    // Click to start - lazy-load game scenes before starting
     this.input.once('pointerdown', () => {
       this.progressManager.recordGameStart();
-      this.scene.start('GameScene');
-      this.scene.launch('UIScene');
+      
+      // Lazy-load GameScene and UIScene if not already loaded
+      // This ensures they're available before we start them
+      const sceneManager = (window as any).sceneManager;
+      if (sceneManager) {
+        sceneManager.preloadScenes(['GameScene', 'UIScene']).then(() => {
+          this.scene.start('GameScene');
+          this.scene.launch('UIScene');
+        });
+      } else {
+        // Fallback if sceneManager is not available
+        this.scene.start('GameScene');
+        this.scene.launch('UIScene');
+      }
     });
   }
 }
