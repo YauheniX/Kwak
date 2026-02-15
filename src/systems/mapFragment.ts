@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { GameConfig } from '../config/gameConfig';
 import { Room } from './roomGenerator';
+import { VisualStyle } from '../config/visualStyle';
 
 /**
  * Fragment location type
@@ -121,10 +121,10 @@ export class MapFragmentSystem {
       maxFragments: config.maxFragments ?? 5,
       merchantFragmentChance: config.merchantFragmentChance ?? 0.5,
       fragmentPurchaseCost: config.fragmentPurchaseCost ?? 100,
-      collectedColor: config.collectedColor ?? 0x00ff00,
-      uncollectedColor: config.uncollectedColor ?? GameConfig.fragmentColor,
-      purchasableColor: config.purchasableColor ?? 0x00ffff,
-      fragmentSize: config.fragmentSize ?? GameConfig.fragmentSize,
+      collectedColor: config.collectedColor ?? VisualStyle.ColorNumbers.fragmentCollected,
+      uncollectedColor: config.uncollectedColor ?? VisualStyle.ColorNumbers.fragmentCollected,
+      purchasableColor: config.purchasableColor ?? VisualStyle.ColorNumbers.fragmentPurchasable,
+      fragmentSize: config.fragmentSize ?? VisualStyle.FragmentVisual.size,
     };
   }
 

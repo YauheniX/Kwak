@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ProgressManager } from '../utils/progressManager';
+import { VisualStyle } from '../config/visualStyle';
 
 export class MenuScene extends Phaser.Scene {
   private progressManager: ProgressManager;
@@ -12,18 +13,23 @@ export class MenuScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.cameras.main;
 
+    // Set background color to deep ocean blue
+    this.cameras.main.setBackgroundColor(VisualStyle.ColorNumbers.deepOceanBlue);
+
     // Title
     const title = this.add.text(width / 2, height / 4, 'KWAK', {
-      fontSize: '64px',
-      color: '#00ff00',
+      fontSize: `${VisualStyle.Typography.fontSize.giant}px`,
+      color: VisualStyle.Colors.treasureGold,
       fontStyle: 'bold',
+      fontFamily: VisualStyle.Typography.headerFont,
     });
     title.setOrigin(0.5);
 
     // Subtitle
-    const subtitle = this.add.text(width / 2, height / 4 + 60, 'A Roguelike Adventure', {
-      fontSize: '24px',
-      color: '#ffffff',
+    const subtitle = this.add.text(width / 2, height / 4 + 60, 'A Pirate Roguelike Adventure', {
+      fontSize: `${VisualStyle.Typography.fontSize.title}px`,
+      color: VisualStyle.Colors.tropicalTeal,
+      fontFamily: VisualStyle.Typography.bodyFont,
     });
     subtitle.setOrigin(0.5);
 
@@ -31,11 +37,12 @@ export class MenuScene extends Phaser.Scene {
     const instructions = this.add.text(
       width / 2,
       height / 2,
-      'Collect all fragments to unlock the treasure!\n\nArrow keys or Click/Touch to move\nAvoid enemies\n\nClick to Start',
+      'Collect all map fragments to unlock the treasure!\n\nArrow keys or Click/Touch to move\nAvoid enemies\n\nClick to Start',
       {
-        fontSize: '18px',
-        color: '#ffffff',
+        fontSize: `${VisualStyle.Typography.fontSize.large}px`,
+        color: VisualStyle.Colors.sandBeige,
         align: 'center',
+        fontFamily: VisualStyle.Typography.bodyFont,
       }
     );
     instructions.setOrigin(0.5);
@@ -47,9 +54,10 @@ export class MenuScene extends Phaser.Scene {
       height - 100,
       `Games Played: ${progress.gamesPlayed} | Wins: ${progress.gamesWon}\nTotal Fragments: ${progress.totalFragmentsCollected} | Best Run: ${progress.highestFragmentsInOneRun}`,
       {
-        fontSize: '14px',
-        color: '#aaaaaa',
+        fontSize: `${VisualStyle.Typography.fontSize.small}px`,
+        color: VisualStyle.Colors.tropicalTeal,
         align: 'center',
+        fontFamily: VisualStyle.Typography.bodyFont,
       }
     );
     stats.setOrigin(0.5);
