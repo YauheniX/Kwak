@@ -283,7 +283,7 @@ export class RoomGenerator {
       this.addEdgeToGraph(edge.room1Id, edge.room2Id);
     }
 
-    // Add loop edges (15-20% of remaining edges)
+    // Add loop edges (percentage configured via loopEdgePercentage, default 15%)
     const remainingEdges = triangulationEdges.filter(
       (e) => !mstEdges.find((m) => this.edgesEqual(e, m))
     );
@@ -692,6 +692,7 @@ export class RoomGenerator {
 
   /**
    * Get position far from a given point
+   * Always returns a position - if minDistance cannot be met, returns the farthest position found
    */
   getPositionFarFrom(
     room: Room,
@@ -717,8 +718,9 @@ export class RoomGenerator {
       }
     }
 
-    // Return best found position (may not meet minDistance requirement)
-    return bestDistance >= minDistance ? bestPos : null;
+    // Return best position found (maintains backward compatibility)
+    // For strict validation, caller should check distance separately
+    return bestPos;
   }
 
   /**
