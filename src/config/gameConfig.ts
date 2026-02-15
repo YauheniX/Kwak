@@ -4,25 +4,25 @@ export const GameConfig = {
   height: 600,
   backgroundColor: '#1a1a2e',
 
-  // Room generation
-  roomWidth: 20,
-  roomHeight: 15,
-  tileSize: 32,
-  maxRooms: 5, // Reduced from 10 to 5
+  // Room generation - configurable parameters for dungeon generation
+  roomWidth: 20, // Maximum room width in tiles (rooms will vary from 8 to this value)
+  roomHeight: 15, // Maximum room height in tiles (rooms will vary from 6 to this value)
+  tileSize: 32, // Size of each tile in pixels
+  maxRooms: 5, // Total number of rooms to generate (minimum 1 guaranteed)
 
   // Player
   playerSpeed: 200,
   playerSize: 16,
   playerColor: 0x00ff00,
 
-  // Enemy
+  // Enemy - configurable spawn parameters
   enemySpeed: 100,
   enemySize: 14,
   enemyColor: 0xff0000,
-  enemiesPerRoom: 1, // Reduced from 3 to 1
+  enemiesPerRoom: 1, // Number of enemies per room (supports multiple spawn points)
 
-  // Fragments & Treasure
-  fragmentsRequired: 4, // 3-5 range, using 4
+  // Fragments & Treasure - configurable loot distribution
+  fragmentsRequired: 4, // Number of fragments to collect (minimum 1 per dungeon guaranteed)
   fragmentSize: 10,
   fragmentColor: 0xffff00,
   treasureSize: 20,
