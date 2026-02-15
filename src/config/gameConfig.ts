@@ -20,6 +20,21 @@ export const GameConfig = {
   enemySize: 14,
   enemyColor: 0xff0000,
   enemiesPerRoom: 1, // Number of enemies per room (supports multiple spawn points)
+  
+  // Enemy spawn configuration
+  enemySpawn: {
+    minDistanceFromPlayer: 200, // Minimum distance from player spawn point (pixels)
+    maxEnemiesPerRoom: 3, // Maximum number of enemies that can spawn in a single room
+    spawnChance: 0.8, // Probability of spawning enemies in a room (0-1)
+    minEnemySpacing: 64, // Minimum distance between enemies in the same room (pixels)
+  },
+  
+  // Enemy AI configuration
+  enemyAI: {
+    chaseDistance: 300, // Distance at which enemy starts chasing player (pixels)
+    patrolMoveDelay: 1000, // Time between patrol movements (milliseconds)
+    patrolRange: 100, // Maximum distance for random patrol movement (pixels)
+  },
 
   // Fragments & Treasure - configurable loot distribution
   fragmentsRequired: 4, // Number of fragments to collect (minimum 1 per dungeon guaranteed)
