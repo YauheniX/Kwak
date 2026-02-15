@@ -27,65 +27,80 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     try {
-      // Generate rooms
+      // Generate dungeon with graph-based procedural generation
       this.roomGenerator = new RoomGenerator();
-      const rooms = this.roomGenerator.generateRooms(GameConfig.maxRooms);
+      const dungeon = this.roomGenerator.generateDungeon();
 
-      if (rooms.length === 0) {
+      if (dungeon.rooms.length === 0) {
         console.error('No rooms generated!');
         return;
       }
 
-      // Draw walls
+      // Draw walls and corridors
       this.drawWalls();
 
-      // Create player in first room
-      const firstRoom = rooms[0];
-      const playerPos = this.roomGenerator.getRandomPositionInRoom(firstRoom);
+      // Get spawn room
+      const spawnRoom = dungeon.rooms.find((r) => r.id === dungeon.spawnRoomId);
+      if (!spawnRoom) {
+        console.error('Spawn room not found!');
+        return;
+      }
+
+      // Create player in spawn room
+      const playerPos = this.roomGenerator.getRandomPositionInRoom(spawnRoom);
       this.player = new Player(this, playerPos.x, playerPos.y);
 
-      // Create fragments in random rooms
-      for (let i = 0; i < GameConfig.fragmentsRequired; i++) {
-        const room = rooms[Math.floor(Math.random() * rooms.length)];
+      // Ensure at least one fragment per dungeon (distribute across rooms)
+      const fragmentCount = Math.max(1, GameConfig.fragmentsRequired);
+      for (let i = 0; i < fragmentCount; i++) {
+        // Distribute fragments across different rooms when possible
+        const roomIndex = i % dungeon.rooms.length;
+        const room = dungeon.rooms[roomIndex];
         const pos = this.roomGenerator.getRandomPositionInRoom(room);
         const fragment = new Fragment(this, pos.x, pos.y);
         this.fragments.push(fragment);
       }
 
-      // Create treasure in a different room from player
-      const treasureRoomIndex =
-        rooms.length > 1 ? Math.floor(Math.random() * (rooms.length - 1)) + 1 : 0;
-      const treasureRoom = rooms[treasureRoomIndex];
-      const treasurePos = this.roomGenerator.getRandomPositionInRoom(treasureRoom);
-      this.treasure = new Treasure(this, treasurePos.x, treasurePos.y);
+      // Create treasure in treasure room
+      const treasureRoom = dungeon.rooms.find((r) => r.id === dungeon.treasureRoomId);
+      if (treasureRoom) {
+        const treasurePos = this.roomGenerator.getRandomPositionInRoom(treasureRoom);
+        this.treasure = new Treasure(this, treasurePos.x, treasurePos.y);
+      } else {
+        // Fallback to random room
+        const room = dungeon.rooms[Math.min(1, dungeon.rooms.length - 1)];
+        const treasurePos = this.roomGenerator.getRandomPositionInRoom(room);
+        this.treasure = new Treasure(this, treasurePos.x, treasurePos.y);
+      }
 
-      // Create enemies in rooms (skip first room where player starts)
-      for (let i = 1; i < rooms.length; i++) {
-        const room = rooms[i];
-        for (let j = 0; j < GameConfig.enemiesPerRoom; j++) {
-          let enemyPos;
-          let attempts = 0;
-          const maxAttempts = 10;
+      // Create enemies with minimum distance from player spawn
+      // Skip spawn room to give player breathing room
+      for (const room of dungeon.rooms) {
+        if (room.id === dungeon.spawnRoomId) continue;
 
-          // Try to find a position far from the player
-          do {
-            enemyPos = this.roomGenerator.getRandomPositionInRoom(room);
-            const distanceToPlayer = Phaser.Math.Distance.Between(
-              playerPos.x,
-              playerPos.y,
-              enemyPos.x,
-              enemyPos.y
-            );
+        // Support multiple spawn points per room
+        const enemyCount = GameConfig.enemiesPerRoom;
+        const enemyPositions = this.roomGenerator.getMultiplePositionsInRoom(
+          room,
+          enemyCount,
+          64 // Minimum 64 pixels between enemies
+        );
 
-            // Ensure enemy is at least 200 pixels away from player
-            if (distanceToPlayer > 200) {
-              break;
-            }
-            attempts++;
-          } while (attempts < maxAttempts);
+        // Create enemies at calculated positions
+        for (const enemyPos of enemyPositions) {
+          // Ensure minimum distance from player spawn
+          const distanceToPlayer = Phaser.Math.Distance.Between(
+            playerPos.x,
+            playerPos.y,
+            enemyPos.x,
+            enemyPos.y
+          );
 
-          const enemy = new Enemy(this, enemyPos.x, enemyPos.y);
-          this.enemies.push(enemy);
+          // Only create enemy if far enough from player (200+ pixels)
+          if (distanceToPlayer >= 200) {
+            const enemy = new Enemy(this, enemyPos.x, enemyPos.y);
+            this.enemies.push(enemy);
+          }
         }
       }
 
@@ -124,6 +139,7 @@ export class GameScene extends Phaser.Scene {
 
     const { tileSize } = GameConfig;
     const rooms = this.roomGenerator.getRooms();
+    const corridors = this.roomGenerator.getCorridors();
 
     // Draw room walls
     for (const room of rooms) {
@@ -132,6 +148,62 @@ export class GameScene extends Phaser.Scene {
           if (this.roomGenerator.isWall(x, y)) {
             this.wallGraphics.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
           }
+        }
+      }
+    }
+
+    // Draw corridor walls
+    // Corridors are included in the isWall check, but we need to draw their borders
+    const corridorWidth = this.roomGenerator.getCorridorWidth();
+    const halfWidth = Math.floor(corridorWidth / 2);
+    
+    for (const corridor of corridors) {
+      const { x1, y1, x2, y2 } = corridor;
+
+      // Horizontal corridor
+      if (y1 === y2) {
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        
+        // Draw top and bottom walls
+        for (let x = minX; x <= maxX; x++) {
+          // Top wall
+          this.wallGraphics.fillRect(
+            x * tileSize,
+            (y1 - halfWidth - 1) * tileSize,
+            tileSize,
+            tileSize
+          );
+          // Bottom wall
+          this.wallGraphics.fillRect(
+            x * tileSize,
+            (y1 + halfWidth + 1) * tileSize,
+            tileSize,
+            tileSize
+          );
+        }
+      }
+      // Vertical corridor
+      else if (x1 === x2) {
+        const minY = Math.min(y1, y2);
+        const maxY = Math.max(y1, y2);
+        
+        // Draw left and right walls
+        for (let y = minY; y <= maxY; y++) {
+          // Left wall
+          this.wallGraphics.fillRect(
+            (x1 - halfWidth - 1) * tileSize,
+            y * tileSize,
+            tileSize,
+            tileSize
+          );
+          // Right wall
+          this.wallGraphics.fillRect(
+            (x1 + halfWidth + 1) * tileSize,
+            y * tileSize,
+            tileSize,
+            tileSize
+          );
         }
       }
     }
