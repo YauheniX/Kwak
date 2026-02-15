@@ -12,7 +12,11 @@ jobs:
   build-android:
     name: Build Android Debug APK
     runs-on: ubuntu-latest
-
+    
+    # Set minimal permissions for GITHUB_TOKEN for security
+    permissions:
+      contents: write  # Required for creating releases on tag push
+      
     steps:
       # Step 1: Check out the repository code
       - name: Checkout repository
