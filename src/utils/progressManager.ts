@@ -1,3 +1,5 @@
+import { saveManager } from '../core/saveManager';
+
 export interface GameProgress {
   gamesPlayed: number;
   gamesWon: number;
@@ -5,69 +7,34 @@ export interface GameProgress {
   highestFragmentsInOneRun: number;
 }
 
-const STORAGE_KEY = 'kwak_progress';
-
+/**
+ * @deprecated Use SaveManager from core/saveManager.ts instead
+ * This class is maintained for backward compatibility
+ */
 export class ProgressManager {
-  private progress: GameProgress;
-
-  constructor() {
-    this.progress = this.loadProgress();
-  }
-
-  private loadProgress(): GameProgress {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored) as GameProgress;
-      } catch (e) {
-        console.error('Failed to parse stored progress', e);
-      }
-    }
-    return {
-      gamesPlayed: 0,
-      gamesWon: 0,
-      totalFragmentsCollected: 0,
-      highestFragmentsInOneRun: 0,
-    };
-  }
-
-  private saveProgress(): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.progress));
-  }
-
   getProgress(): GameProgress {
-    return { ...this.progress };
+    const metaState = saveManager.getMetaState();
+    return {
+      gamesPlayed: metaState.gamesPlayed,
+      gamesWon: metaState.gamesWon,
+      totalFragmentsCollected: metaState.totalFragmentsCollected,
+      highestFragmentsInOneRun: metaState.highestFragmentsInOneRun,
+    };
   }
 
   recordGameStart(): void {
-    this.progress.gamesPlayed++;
-    this.saveProgress();
+    saveManager.recordGameStart();
   }
 
   recordGameWon(fragmentsCollected: number): void {
-    this.progress.gamesWon++;
-    this.progress.totalFragmentsCollected += fragmentsCollected;
-    if (fragmentsCollected > this.progress.highestFragmentsInOneRun) {
-      this.progress.highestFragmentsInOneRun = fragmentsCollected;
-    }
-    this.saveProgress();
+    saveManager.recordGameWon(fragmentsCollected);
   }
 
   recordGameLost(fragmentsCollected: number): void {
-    this.progress.totalFragmentsCollected += fragmentsCollected;
-    if (fragmentsCollected > this.progress.highestFragmentsInOneRun) {
-      this.progress.highestFragmentsInOneRun = fragmentsCollected;
-    }
-    this.saveProgress();
+    saveManager.recordGameLost(fragmentsCollected);
   }
 
   resetProgress(): void {
-    this.progress = {
-      gamesPlayed: 0,
-      gamesWon: 0,
-      totalFragmentsCollected: 0,
-      highestFragmentsInOneRun: 0,
-    };
-    this.saveProgress();
+    saveManager.resetMeta();
   }
 }
