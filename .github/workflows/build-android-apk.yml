@@ -68,11 +68,11 @@ jobs:
 
       # Step 9: Set up Java Development Kit (JDK)
       # Required for building Android apps with Gradle
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       # Step 10: Set up Android SDK
       # Install required Android SDK components for API level 31+
