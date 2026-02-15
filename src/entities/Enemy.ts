@@ -50,6 +50,8 @@ export class Enemy {
 
   private moveTowardsTarget(): void {
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    if (!body) return; // Safety check for body initialization
+    
     const angle = Phaser.Math.Angle.Between(
       this.sprite.x,
       this.sprite.y,
