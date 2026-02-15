@@ -1,8 +1,10 @@
+import { VisualStyle } from './visualStyle';
+
 export const GameConfig = {
   // Display
   width: 800,
   height: 600,
-  backgroundColor: '#1a1a2e',
+  backgroundColor: VisualStyle.Colors.deepOceanBlue,
 
   // Room generation - configurable parameters for dungeon generation
   roomWidth: 20, // Maximum room width in tiles (rooms will vary from 8 to this value)
@@ -13,12 +15,12 @@ export const GameConfig = {
   // Player
   playerSpeed: 200,
   playerSize: 16,
-  playerColor: 0x00ff00,
+  playerColor: VisualStyle.ColorNumbers.emeraldGreen,
 
   // Enemy - configurable spawn parameters
   enemySpeed: 100,
   enemySize: 14,
-  enemyColor: 0xff0000,
+  enemyColor: VisualStyle.ColorNumbers.enemyColor,
   // Deprecated: Use enemySpawn.maxEnemiesPerRoom instead
   enemiesPerRoom: 1, // Number of enemies per room (supports multiple spawn points)
   
@@ -39,12 +41,12 @@ export const GameConfig = {
 
   // Fragments & Treasure - configurable loot distribution
   fragmentsRequired: 4, // Number of fragments to collect (minimum 1 per dungeon guaranteed)
-  fragmentSize: 10,
-  fragmentColor: 0xffff00,
-  treasureSize: 20,
-  treasureColor: 0xffd700,
+  fragmentSize: VisualStyle.FragmentVisual.size,
+  fragmentColor: VisualStyle.ColorNumbers.fragmentCollected,
+  treasureSize: VisualStyle.TreasureChestVisual.size,
+  treasureColor: VisualStyle.ColorNumbers.treasureChest,
 
   // UI
-  fontSize: 16,
-  uiFontColor: '#ffffff',
+  fontSize: VisualStyle.Typography.fontSize.body,
+  uiFontColor: VisualStyle.Colors.sandBeige,
 };

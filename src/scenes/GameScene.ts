@@ -11,6 +11,7 @@ import { Merchant } from '../entities/Merchant';
 import { GameConfig } from '../config/gameConfig';
 import { ProgressManager } from '../utils/progressManager';
 import { saveManager } from '../core/saveManager';
+import { VisualStyle } from '../config/visualStyle';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -190,7 +191,7 @@ export class GameScene extends Phaser.Scene {
 
   private drawWalls(): void {
     this.wallGraphics = this.add.graphics();
-    this.wallGraphics.fillStyle(0x444444, 1);
+    this.wallGraphics.fillStyle(VisualStyle.ColorNumbers.wallColor, 1);
 
     const { tileSize } = GameConfig;
     const rooms = this.roomGenerator.getRooms();
