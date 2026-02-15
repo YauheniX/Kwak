@@ -12,6 +12,8 @@ import { GameConfig } from '../config/gameConfig';
 import { ProgressManager } from '../utils/progressManager';
 import { saveManager } from '../core/saveManager';
 import { VisualStyle } from '../config/visualStyle';
+import { progressionSystem } from '../systems/progressionSystem';
+import { SCALE_CONFIG } from '../config/scaleConfig';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -32,6 +34,7 @@ export class GameScene extends Phaser.Scene {
   private lastHitTime: number = 0;
   private hitCooldown: number = 2000; // 2 second cooldown between hits
   private collisionsEnabled: boolean = false;
+  private currentLevel: number = 1;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -40,8 +43,14 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     try {
+      // Get current dungeon level from progression system
+      this.currentLevel = progressionSystem.getCurrentLevel();
+      
       // Reset run state for a new run
       saveManager.resetRun();
+      
+      // Setup camera bounds for responsive scaling
+      this.setupCamera();
       
       // Generate dungeon with graph-based procedural generation
       this.roomGenerator = new RoomGenerator();
@@ -66,8 +75,10 @@ export class GameScene extends Phaser.Scene {
       const playerPos = this.roomGenerator.getRandomPositionInRoom(spawnRoom);
       this.player = new Player(this, playerPos.x, playerPos.y);
 
-      // Initialize enemy spawner system
-      this.enemySpawner = new EnemySpawner(this, this.roomGenerator);
+      // Initialize enemy spawner system with level-based configuration
+      this.enemySpawner = new EnemySpawner(this, this.roomGenerator, {
+        dungeonLevel: this.currentLevel,
+      });
 
       // Spawn enemies using the modular system
       this.enemies = this.enemySpawner.spawnEnemies(
@@ -187,6 +198,19 @@ export class GameScene extends Phaser.Scene {
     } catch (error) {
       console.error('Error creating game scene:', error);
     }
+  }
+
+  /**
+   * Setup camera with proper bounds for responsive scaling
+   */
+  private setupCamera(): void {
+    // Set camera bounds based on the world size
+    // The camera will follow the player within these bounds
+    const worldWidth = SCALE_CONFIG.baseWidth * 2;
+    const worldHeight = SCALE_CONFIG.baseHeight * 2;
+    
+    this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
   }
 
   private drawWalls(): void {
@@ -491,6 +515,7 @@ export class GameScene extends Phaser.Scene {
       if (this.player.health <= 0) {
         const fragmentsCollected = this.mapFragmentSystem.getCollectedCount();
         this.progressManager.recordGameLost(fragmentsCollected);
+        progressionSystem.recordLoss();
         this.scene.stop('UIScene');
 
         if (window.sceneManager) {
@@ -517,9 +542,10 @@ export class GameScene extends Phaser.Scene {
     if (this.treasureChest && !this.treasureChest.isCollected()) {
       this.treasureChest.collect();
 
-      // Win! Lazy-load GameOverScene before transitioning
+      // Win! Record progression and advance level
       const fragmentsCollected = this.mapFragmentSystem.getCollectedCount();
       this.progressManager.recordGameWon(fragmentsCollected);
+      progressionSystem.recordWin();
       this.scene.stop('UIScene');
 
       if (window.sceneManager) {
@@ -534,9 +560,10 @@ export class GameScene extends Phaser.Scene {
 
   private collectTreasure(): void {
     if (!this.treasure.isLocked()) {
-      // Win! Lazy-load GameOverScene before transitioning
+      // Win! Record progression and advance level
       const fragmentsCollected = this.mapFragmentSystem.getCollectedCount();
       this.progressManager.recordGameWon(fragmentsCollected);
+      progressionSystem.recordWin();
       this.scene.stop('UIScene');
       
       // Ensure GameOverScene is loaded before starting it
@@ -569,9 +596,10 @@ export class GameScene extends Phaser.Scene {
       });
 
       if (this.player.health <= 0) {
-        // Game over - lazy-load GameOverScene before transitioning
+        // Game over - record loss and reset level
         const fragmentsCollected = this.mapFragmentSystem.getCollectedCount();
         this.progressManager.recordGameLost(fragmentsCollected);
+        progressionSystem.recordLoss();
         this.scene.stop('UIScene');
         
         // Ensure GameOverScene is loaded before starting it
@@ -598,6 +626,7 @@ export class GameScene extends Phaser.Scene {
       fragments: this.mapFragmentSystem.getCollectedCount(),
       fragmentsRequired: this.mapFragmentSystem.getTotalFragments(),
       gold: this.currencySystem.getGold(),
+      level: this.currentLevel,
       fragmentData: this.mapFragmentSystem.getFragments(),
     });
   }
