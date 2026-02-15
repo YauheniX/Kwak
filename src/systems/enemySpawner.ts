@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { Enemy } from '../entities/Enemy';
 import { RoomGenerator, Room } from './roomGenerator';
 import { GameConfig } from '../config/gameConfig';
-import { EnemyType as EnemyTypeEnum, getRandomEnemyType, getMaxEnemiesPerRoom } from '../config/enemyBalance';
+import { getRandomEnemyType, getMaxEnemiesPerRoom } from '../config/enemyBalance';
 
 /**
  * Configuration for enemy spawning

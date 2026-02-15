@@ -18,6 +18,7 @@ export interface ProgressionState {
   totalLosses: number; // Total number of losses
   consecutiveWins: number; // Current win streak
   consecutiveLosses: number; // Current loss streak
+  bestWinStreak: number; // Best win streak ever achieved
 }
 
 /**
@@ -31,6 +32,7 @@ const DEFAULT_STATE: ProgressionState = {
   totalLosses: 0,
   consecutiveWins: 0,
   consecutiveLosses: 0,
+  bestWinStreak: 0,
 };
 
 /**
@@ -97,6 +99,11 @@ export class ProgressionSystem {
     this.state.totalWins++;
     this.state.consecutiveWins++;
     this.state.consecutiveLosses = 0;
+
+    // Update best win streak
+    if (this.state.consecutiveWins > this.state.bestWinStreak) {
+      this.state.bestWinStreak = this.state.consecutiveWins;
+    }
 
     // Advance to next level
     this.state.currentLevel++;
@@ -189,7 +196,7 @@ export class ProgressionSystem {
     return {
       winRate: Math.round(winRate * 10) / 10, // Round to 1 decimal
       totalRuns: this.state.totalRuns,
-      bestStreak: this.state.consecutiveWins,
+      bestStreak: this.state.bestWinStreak,
       currentStreak: this.state.consecutiveWins,
       highestLevel: this.state.highestLevelReached,
     };

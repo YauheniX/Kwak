@@ -409,19 +409,39 @@ export class MazeGenerator {
     const spawnRoom = this.rooms[0];
     spawnRoom.type = RoomType.SPAWN;
 
-    // Last room = boss
+    // Last room = boss (or spawn if only 1 room)
     const bossRoom = this.rooms[this.rooms.length - 1];
-    bossRoom.type = RoomType.BOSS;
+    if (bossRoom.id !== spawnRoom.id) {
+      bossRoom.type = RoomType.BOSS;
+    }
 
-    // Middle room = treasure
-    const treasureIndex = Math.floor(this.rooms.length / 2);
+    // Middle room = treasure (ensure it's different from spawn and boss)
+    let treasureIndex = Math.floor(this.rooms.length / 2);
+    if (this.rooms.length === 1) {
+      treasureIndex = 0; // Same as spawn if only 1 room
+    } else if (this.rooms.length === 2) {
+      treasureIndex = 1; // Use boss room if only 2 rooms
+    }
     const treasureRoom = this.rooms[treasureIndex];
     treasureRoom.type = RoomType.TREASURE;
 
-    // Another middle room = shop
-    const shopIndex = Math.floor(this.rooms.length / 3);
+    // Shop room (ensure it's different from other special rooms)
+    let shopIndex = Math.floor(this.rooms.length / 3);
+    if (this.rooms.length === 1) {
+      shopIndex = 0; // Same as spawn if only 1 room
+    } else if (this.rooms.length === 2) {
+      shopIndex = 0; // Use spawn room if only 2 rooms
+    } else if (shopIndex === treasureIndex) {
+      // Avoid collision with treasure room
+      shopIndex = treasureIndex + 1;
+      if (shopIndex >= this.rooms.length) {
+        shopIndex = treasureIndex - 1;
+      }
+    }
     const shopRoom = this.rooms[shopIndex];
-    shopRoom.type = RoomType.SHOP;
+    if (shopRoom.type !== RoomType.TREASURE && shopRoom.type !== RoomType.BOSS) {
+      shopRoom.type = RoomType.SHOP;
+    }
 
     return {
       spawnRoomId: spawnRoom.id,

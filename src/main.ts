@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GameConfig } from './config/gameConfig';
-import { getPhaserScaleConfig, SCALE_CONFIG } from './config/scaleConfig';
+import { getPhaserScaleConfig } from './config/scaleConfig';
 
 /**
  * LAZY-LOADING SETUP:
