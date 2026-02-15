@@ -92,6 +92,14 @@ export class GameScene extends Phaser.Scene {
       // Setup input
       this.cursors = this.input.keyboard!.createCursorKeys();
 
+      // Setup pointer/touch input for mobile
+      this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        // Don't process clicks on UI elements or if game is over
+        if (this.player && this.scene.isActive('GameScene')) {
+          this.player.setTarget(pointer.worldX, pointer.worldY);
+        }
+      });
+
       // Setup collisions
       this.setupCollisions();
 

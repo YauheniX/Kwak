@@ -59,7 +59,9 @@ npm run format
 
 ## How to Play
 
-- **Movement**: Use arrow keys to move your character (green circle)
+- **Movement**: 
+  - **Desktop**: Use arrow keys to move your character (green circle)
+  - **Mobile/Touch**: Click or tap anywhere on the screen to move towards that location
 - **Objective**: Collect all 4 fragments (yellow circles) to unlock the treasure (gold circle)
 - **Enemies**: Avoid red enemies that patrol the rooms
 - **Health**: You have 1000 health points. Each enemy hit deals 10 damage with a 2-second cooldown
