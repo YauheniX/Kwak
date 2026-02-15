@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Enemy } from '../entities/Enemy';
 import { RoomGenerator, Room } from './roomGenerator';
 import { GameConfig } from '../config/gameConfig';
+import { EnemyType as EnemyTypeEnum, getRandomEnemyType, getMaxEnemiesPerRoom } from '../config/enemyBalance';
 
 /**
  * Configuration for enemy spawning
@@ -11,13 +12,14 @@ export interface EnemySpawnConfig {
   maxEnemiesPerRoom?: number; // Maximum enemies per room
   spawnChance?: number; // Probability of spawning enemies (0-1)
   minEnemySpacing?: number; // Minimum spacing between enemies
+  dungeonLevel?: number; // Current dungeon level for scaling
 }
 
 /**
  * Enemy type definition for extensibility
  */
 export interface EnemyType {
-  createEnemy: (scene: Phaser.Scene, x: number, y: number) => Enemy;
+  createEnemy: (scene: Phaser.Scene, x: number, y: number, level: number) => Enemy;
   weight?: number; // Spawn weight for random selection (default: 1)
 }
 
@@ -45,12 +47,15 @@ export class EnemySpawner {
       maxEnemiesPerRoom: config.maxEnemiesPerRoom ?? GameConfig.enemySpawn.maxEnemiesPerRoom,
       spawnChance: config.spawnChance ?? GameConfig.enemySpawn.spawnChance,
       minEnemySpacing: config.minEnemySpacing ?? GameConfig.enemySpawn.minEnemySpacing,
+      dungeonLevel: config.dungeonLevel ?? 1,
     };
 
-    // Register default enemy type
+    // Register default enemy type - uses level-based random type selection
     this.registerEnemyType('default', {
-      createEnemy: (scene: Phaser.Scene, x: number, y: number) => 
-        new Enemy(scene, x, y, GameConfig.enemyAI),
+      createEnemy: (scene: Phaser.Scene, x: number, y: number, level: number) => {
+        const enemyType = getRandomEnemyType(level);
+        return new Enemy(scene, x, y, enemyType, level);
+      },
       weight: 1,
     });
   }
@@ -135,12 +140,16 @@ export class EnemySpawner {
    * Returns 0-maxEnemiesPerRoom based on randomization and depth
    */
   private calculateEnemyCount(room: Room): number {
-    // Random count from 0 to maxEnemiesPerRoom
-    let count = Math.floor(Math.random() * (this.config.maxEnemiesPerRoom + 1));
+    // Use level-based max enemies per room
+    const levelBasedMax = getMaxEnemiesPerRoom(this.config.dungeonLevel);
+    const maxCount = Math.min(this.config.maxEnemiesPerRoom, levelBasedMax);
+    
+    // Random count from 0 to maxCount
+    let count = Math.floor(Math.random() * (maxCount + 1));
 
     // Scale with room depth (higher depth = more likely to have max enemies)
     if (room.depth > 2 && count > 0) {
-      count = Math.min(this.config.maxEnemiesPerRoom, count + 1);
+      count = Math.min(maxCount, count + 1);
     }
 
     return count;
@@ -166,12 +175,12 @@ export class EnemySpawner {
       const weight = type.weight ?? 1;
       random -= weight;
       if (random <= 0) {
-        return type.createEnemy(this.scene, x, y);
+        return type.createEnemy(this.scene, x, y, this.config.dungeonLevel);
       }
     }
 
     // Fallback to first type
-    return types[0].type.createEnemy(this.scene, x, y);
+    return types[0].type.createEnemy(this.scene, x, y, this.config.dungeonLevel);
   }
 
   /**

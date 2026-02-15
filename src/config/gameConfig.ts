@@ -1,9 +1,10 @@
 import { VisualStyle } from './visualStyle';
+import { SCALE_CONFIG } from './scaleConfig';
 
 export const GameConfig = {
-  // Display
-  width: 800,
-  height: 600,
+  // Display - use responsive scale configuration
+  width: SCALE_CONFIG.baseWidth,
+  height: SCALE_CONFIG.baseHeight,
   backgroundColor: VisualStyle.Colors.deepOceanBlue,
 
   // Room generation - configurable parameters for dungeon generation

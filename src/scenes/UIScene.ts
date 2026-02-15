@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import { MapFragmentData, FragmentState } from '../systems/mapFragment';
 import { VisualStyle } from '../config/visualStyle';
+import { SPACING, SCALE_CONFIG } from '../config/scaleConfig';
 
 export class UIScene extends Phaser.Scene {
   private healthText!: Phaser.GameObjects.Text;
   private healthBar!: Phaser.GameObjects.Graphics;
   private fragmentText!: Phaser.GameObjects.Text;
   private goldText!: Phaser.GameObjects.Text;
+  private levelText!: Phaser.GameObjects.Text;
   private fragmentIndicators: Phaser.GameObjects.Container[] = [];
   private maxHealth: number = 1000;
 
@@ -15,14 +17,17 @@ export class UIScene extends Phaser.Scene {
   }
 
   create(): void {
-    const { width } = this.cameras.main;
-
+    // Use responsive positioning based on scale config
+    const safeLeft = SPACING.sm;
+    const safeTop = SPACING.sm;
+    const safeRight = SCALE_CONFIG.baseWidth - SPACING.sm;
+    
     // Create health bar background
     const healthBarBg = this.add.graphics();
     healthBarBg.fillStyle(VisualStyle.ColorNumbers.darkWoodBrown, 0.8);
     healthBarBg.fillRoundedRect(
-      VisualStyle.HudLayout.topLeft.x,
-      VisualStyle.HudLayout.topLeft.y,
+      safeLeft,
+      safeTop,
       VisualStyle.ComponentSize.healthBarWidth,
       VisualStyle.ComponentSize.healthBarHeight,
       4
@@ -34,8 +39,8 @@ export class UIScene extends Phaser.Scene {
 
     // Health label
     this.healthText = this.add.text(
-      VisualStyle.HudLayout.topLeft.x + VisualStyle.Spacing.sm,
-      VisualStyle.HudLayout.topLeft.y + VisualStyle.Spacing.xs,
+      safeLeft + SPACING.sm,
+      safeTop + SPACING.xs,
       'Health: 1000',
       {
         fontSize: `${VisualStyle.Typography.fontSize.small}px`,
@@ -44,31 +49,45 @@ export class UIScene extends Phaser.Scene {
       }
     );
 
+    // Level display (NEW)
+    this.levelText = this.add.text(
+      safeLeft,
+      safeTop + VisualStyle.ComponentSize.healthBarHeight + SPACING.sm,
+      'Level: 1',
+      {
+        fontSize: `${VisualStyle.Typography.fontSize.body}px`,
+        color: VisualStyle.Colors.treasureGold,
+        fontFamily: VisualStyle.Typography.uiFont,
+        backgroundColor: VisualStyle.Colors.darkWoodBrown,
+        padding: { x: SPACING.sm, y: SPACING.xs },
+      }
+    );
+
     // Gold display (with icon placeholder)
     this.goldText = this.add.text(
-      VisualStyle.HudLayout.topLeft.x,
-      VisualStyle.HudLayout.topLeft.y + VisualStyle.ComponentSize.healthBarHeight + VisualStyle.Spacing.sm,
+      safeLeft,
+      safeTop + VisualStyle.ComponentSize.healthBarHeight + SPACING.sm + SPACING.lg,
       '⚫ Gold: 0',
       {
         fontSize: `${VisualStyle.Typography.fontSize.body}px`,
         color: VisualStyle.Colors.treasureGold,
         fontFamily: VisualStyle.Typography.uiFont,
         backgroundColor: VisualStyle.Colors.darkWoodBrown,
-        padding: { x: VisualStyle.Spacing.sm, y: VisualStyle.Spacing.xs },
+        padding: { x: SPACING.sm, y: SPACING.xs },
       }
     );
 
     // Fragment display label
     this.fragmentText = this.add.text(
-      width + VisualStyle.HudLayout.topRight.x,
-      VisualStyle.HudLayout.topRight.y,
+      safeRight,
+      safeTop,
       'Map Fragments: 0 / 0',
       {
         fontSize: `${VisualStyle.Typography.fontSize.body}px`,
         color: VisualStyle.Colors.sandBeige,
         fontFamily: VisualStyle.Typography.uiFont,
         backgroundColor: VisualStyle.Colors.darkWoodBrown,
-        padding: { x: VisualStyle.Spacing.sm, y: VisualStyle.Spacing.xs },
+        padding: { x: SPACING.sm, y: SPACING.xs },
       }
     );
     this.fragmentText.setOrigin(1, 0);
@@ -83,11 +102,17 @@ export class UIScene extends Phaser.Scene {
     fragments: number;
     fragmentsRequired: number;
     gold: number;
+    level?: number;
     fragmentData: MapFragmentData[];
   }): void {
     this.healthText.setText(`Health: ${data.health}`);
     this.goldText.setText(`⚫ Gold: ${data.gold}`);
     this.fragmentText.setText(`Map Fragments: ${data.fragments} / ${data.fragmentsRequired}`);
+    
+    // Update level display
+    if (data.level !== undefined) {
+      this.levelText.setText(`Level: ${data.level}`);
+    }
 
     // Update health bar
     this.updateHealthBar(data.health, this.maxHealth);
@@ -116,8 +141,8 @@ export class UIScene extends Phaser.Scene {
     // Draw health bar with gradient effect
     this.healthBar.fillStyle(healthColor, 1);
     this.healthBar.fillRoundedRect(
-      VisualStyle.HudLayout.topLeft.x + 4,
-      VisualStyle.HudLayout.topLeft.y + 4,
+      SPACING.sm + 4,
+      SPACING.sm + 4,
       currentWidth,
       VisualStyle.ComponentSize.healthBarHeight - 8,
       2
@@ -129,9 +154,9 @@ export class UIScene extends Phaser.Scene {
     this.fragmentIndicators.forEach((indicator) => indicator.destroy());
     this.fragmentIndicators = [];
 
-    const { width } = this.cameras.main;
-    const startX = width + VisualStyle.HudLayout.topRight.x;
-    const startY = VisualStyle.HudLayout.topRight.y + VisualStyle.ComponentSize.healthBarHeight + VisualStyle.Spacing.md;
+    const safeRight = SCALE_CONFIG.baseWidth - SPACING.sm;
+    const startX = safeRight;
+    const startY = SPACING.sm + VisualStyle.ComponentSize.healthBarHeight + SPACING.md;
     const spacing = VisualStyle.ComponentSize.fragmentIndicatorSpacing;
 
     // Create visual indicators for each fragment (torn parchment style)

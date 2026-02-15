@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameConfig } from './config/gameConfig';
+import { getPhaserScaleConfig, SCALE_CONFIG } from './config/scaleConfig';
 
 /**
  * LAZY-LOADING SETUP:
@@ -96,8 +97,8 @@ class SceneManager {
 // Only BootScene is loaded initially - all other scenes are lazy-loaded
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: GameConfig.width,
-  height: GameConfig.height,
+  // Use responsive scale configuration for mobile & desktop support
+  scale: getPhaserScaleConfig(),
   backgroundColor: GameConfig.backgroundColor,
   parent: 'game-container',
   physics: {
