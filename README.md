@@ -71,11 +71,9 @@ npm run format
 ```
 src/
 ├── config/          # Game configuration
-├── core/            # Core game systems
 ├── entities/        # Game entities (Player, Enemy, Collectibles)
 ├── scenes/          # Phaser scenes (Boot, Preload, Menu, Game, UI, GameOver)
 ├── systems/         # Game systems (Room generation)
-├── ui/              # UI components
 ├── utils/           # Utility functions (Progress manager)
 └── main.ts          # Entry point
 ```

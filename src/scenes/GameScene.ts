@@ -52,8 +52,10 @@ export class GameScene extends Phaser.Scene {
         this.fragments.push(fragment);
       }
 
-      // Create treasure in a random room (not the first)
-      const treasureRoom = rooms[Math.min(1, rooms.length - 1)];
+      // Create treasure in a different room from player
+      const treasureRoomIndex =
+        rooms.length > 1 ? Math.floor(Math.random() * (rooms.length - 1)) + 1 : 0;
+      const treasureRoom = rooms[treasureRoomIndex];
       const treasurePos = this.roomGenerator.getRandomPositionInRoom(treasureRoom);
       this.treasure = new Treasure(this, treasurePos.x, treasurePos.y);
 
