@@ -330,8 +330,15 @@ export class GameScene extends Phaser.Scene {
     const result = this.mapFragmentSystem.purchaseFragment(fragment.id);
     if (result.success) {
       // Remove gold from both systems
-      this.currencySystem.removeGold(result.cost);
-      saveManager.removeGold(result.cost);
+      const currencyRemoved = this.currencySystem.removeGold(result.cost);
+      const saveRemoved = saveManager.removeGold(result.cost);
+      
+      // Ensure both systems are in sync
+      if (!currencyRemoved || !saveRemoved) {
+        console.error('Currency system out of sync!');
+        return;
+      }
+      
       saveManager.collectFragment(fragment.id);
       
       this.emitGameState();
