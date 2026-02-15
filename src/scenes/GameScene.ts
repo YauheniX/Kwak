@@ -25,7 +25,6 @@ export class GameScene extends Phaser.Scene {
   private merchant?: Merchant;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private interactKey!: Phaser.Input.Keyboard.Key;
-  private digKey!: Phaser.Input.Keyboard.Key;
   private digKeyAlt!: Phaser.Input.Keyboard.Key;
   private progressManager: ProgressManager;
   private wallGraphics!: Phaser.GameObjects.Graphics;
@@ -161,7 +160,6 @@ export class GameScene extends Phaser.Scene {
       // Setup input
       this.cursors = this.input.keyboard!.createCursorKeys();
       this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-      this.digKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
       this.digKeyAlt = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
       // Setup pointer/touch input for mobile
@@ -607,22 +605,27 @@ export class GameScene extends Phaser.Scene {
     // Update player
     this.player.update(this.cursors);
 
-    // Handle dig key (E or Space) - only if not near merchant
+    // Handle E key and Space key
     const playerPos = this.player.getPosition();
     const nearMerchant = this.merchant && this.merchant.isPlayerInRange();
     
-    if (!nearMerchant && (Phaser.Input.Keyboard.JustDown(this.digKey) || Phaser.Input.Keyboard.JustDown(this.digKeyAlt))) {
+    // E key: merchant interaction when near, digging when not
+    if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      if (nearMerchant) {
+        this.purchaseFragment();
+      } else {
+        this.handleDig();
+      }
+    }
+    
+    // Space key: always dig (no merchant interaction)
+    if (Phaser.Input.Keyboard.JustDown(this.digKeyAlt)) {
       this.handleDig();
     }
 
     // Update merchant if exists
     if (this.merchant) {
       this.merchant.update(playerPos.x, playerPos.y);
-
-      // Handle interact key (only when near merchant)
-      if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
-        this.purchaseFragment();
-      }
     }
 
     // Update enemies

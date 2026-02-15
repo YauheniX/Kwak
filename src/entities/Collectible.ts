@@ -52,7 +52,6 @@ export class Treasure {
  */
 export class TreasureChest {
   public sprite: Phaser.GameObjects.Arc;
-  private particles?: Phaser.GameObjects.Particles.ParticleEmitter;
   private collected: boolean = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -123,8 +122,5 @@ export class TreasureChest {
    */
   destroy(): void {
     this.sprite.destroy();
-    if (this.particles) {
-      this.particles.stop();
-    }
   }
 }
