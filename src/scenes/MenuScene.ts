@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ProgressManager } from '../utils/progressManager';
 import { VisualStyle } from '../config/visualStyle';
+import { getAnchoredPosition, SPACING } from '../config/scaleConfig';
 
 export class MenuScene extends Phaser.Scene {
   private progressManager: ProgressManager;
@@ -16,8 +17,9 @@ export class MenuScene extends Phaser.Scene {
     // Set background color to deep ocean blue
     this.cameras.main.setBackgroundColor(VisualStyle.ColorNumbers.deepOceanBlue);
 
-    // Title
-    const title = this.add.text(width / 2, height / 4, 'KWAK', {
+    // Title - positioned at top-center with offset
+    const titlePos = getAnchoredPosition('top-center', 0, SPACING.xxxl, width, height);
+    const title = this.add.text(titlePos.x, titlePos.y, 'KWAK', {
       fontSize: `${VisualStyle.Typography.fontSize.giant}px`,
       color: VisualStyle.Colors.treasureGold,
       fontStyle: 'bold',
@@ -25,18 +27,20 @@ export class MenuScene extends Phaser.Scene {
     });
     title.setOrigin(0.5);
 
-    // Subtitle
-    const subtitle = this.add.text(width / 2, height / 4 + 60, 'A Pirate Roguelike Adventure', {
+    // Subtitle - positioned below title using spacing constants
+    const subtitlePos = getAnchoredPosition('top-center', 0, SPACING.xxxl + SPACING.xxxl, width, height);
+    const subtitle = this.add.text(subtitlePos.x, subtitlePos.y, 'A Pirate Roguelike Adventure', {
       fontSize: `${VisualStyle.Typography.fontSize.title}px`,
       color: VisualStyle.Colors.tropicalTeal,
       fontFamily: VisualStyle.Typography.bodyFont,
     });
     subtitle.setOrigin(0.5);
 
-    // Instructions
+    // Instructions - centered on screen
+    const instructionsPos = getAnchoredPosition('center', 0, 0, width, height);
     const instructions = this.add.text(
-      width / 2,
-      height / 2,
+      instructionsPos.x,
+      instructionsPos.y,
       'Collect all map fragments to unlock the treasure!\n\nArrow keys or Tap to move\nTap enemy to attack\nTap merchant to interact (or walk closer)\nLong-press to dig\nAvoid enemies\n\nTap to Start',
       {
         fontSize: `${VisualStyle.Typography.fontSize.large}px`,
@@ -47,11 +51,12 @@ export class MenuScene extends Phaser.Scene {
     );
     instructions.setOrigin(0.5);
 
-    // Stats
+    // Stats - positioned at bottom-center with offset using spacing constants
     const progress = this.progressManager.getProgress();
+    const statsPos = getAnchoredPosition('bottom-center', 0, -SPACING.xxxl, width, height);
     const stats = this.add.text(
-      width / 2,
-      height - 100,
+      statsPos.x,
+      statsPos.y,
       `Games Played: ${progress.gamesPlayed} | Wins: ${progress.gamesWon}\nTotal Fragments: ${progress.totalFragmentsCollected} | Best Run: ${progress.highestFragmentsInOneRun}`,
       {
         fontSize: `${VisualStyle.Typography.fontSize.small}px`,
