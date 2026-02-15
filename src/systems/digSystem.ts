@@ -44,6 +44,7 @@ export class DigSystem {
   private config: Required<DigSystemConfig>;
   private isMapRevealed: boolean = false;
   private visualHint?: Phaser.GameObjects.Graphics;
+  private hintTween?: Phaser.Tweens.Tween;
 
   constructor(scene: Phaser.Scene, config: DigSystemConfig = {}) {
     this.scene = scene;
@@ -173,7 +174,7 @@ export class DigSystem {
     this.visualHint.strokePath();
 
     // Add pulsing animation
-    this.scene.tweens.add({
+    this.hintTween = this.scene.tweens.add({
       targets: this.visualHint,
       alpha: { from: alpha, to: alpha * 2 },
       duration: 1000,
@@ -262,6 +263,10 @@ export class DigSystem {
    * Clean up resources
    */
   destroy(): void {
+    if (this.hintTween) {
+      this.hintTween.stop();
+      this.hintTween = undefined;
+    }
     if (this.visualHint) {
       this.visualHint.destroy();
       this.visualHint = undefined;

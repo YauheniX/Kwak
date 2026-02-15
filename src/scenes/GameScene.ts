@@ -605,8 +605,10 @@ export class GameScene extends Phaser.Scene {
     // Update player
     this.player.update(this.cursors);
 
-    // Handle E key and Space key
+    // Get player position once for this update cycle
     const playerPos = this.player.getPosition();
+
+    // Handle E key and Space key
     const nearMerchant = this.merchant && this.merchant.isPlayerInRange();
     
     // E key: merchant interaction when near, digging when not
