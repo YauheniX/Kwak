@@ -122,7 +122,7 @@ export class MapFragmentSystem {
       merchantFragmentChance: config.merchantFragmentChance ?? 0.5,
       fragmentPurchaseCost: config.fragmentPurchaseCost ?? 100,
       collectedColor: config.collectedColor ?? VisualStyle.ColorNumbers.fragmentCollected,
-      uncollectedColor: config.uncollectedColor ?? VisualStyle.ColorNumbers.fragmentCollected,
+      uncollectedColor: config.uncollectedColor ?? VisualStyle.ColorNumbers.fragmentUncollected,
       purchasableColor: config.purchasableColor ?? VisualStyle.ColorNumbers.fragmentPurchasable,
       fragmentSize: config.fragmentSize ?? VisualStyle.FragmentVisual.size,
     };

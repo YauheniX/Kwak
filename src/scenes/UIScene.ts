@@ -19,7 +19,7 @@ export class UIScene extends Phaser.Scene {
 
     // Create health bar background
     const healthBarBg = this.add.graphics();
-    healthBarBg.fillStyle(parseInt(VisualStyle.Colors.darkWoodBrown.replace('#', '0x')), 0.8);
+    healthBarBg.fillStyle(VisualStyle.ColorNumbers.darkWoodBrown, 0.8);
     healthBarBg.fillRoundedRect(
       VisualStyle.HudLayout.topLeft.x,
       VisualStyle.HudLayout.topLeft.y,
@@ -106,11 +106,11 @@ export class UIScene extends Phaser.Scene {
     // Determine health bar color based on health percentage
     let healthColor: number;
     if (healthPercent > 0.6) {
-      healthColor = parseInt(VisualStyle.Colors.emeraldGreen.replace('#', '0x'));
+      healthColor = VisualStyle.ColorNumbers.emeraldGreen;
     } else if (healthPercent > 0.3) {
-      healthColor = parseInt(VisualStyle.Colors.treasureGold.replace('#', '0x'));
+      healthColor = VisualStyle.ColorNumbers.treasureGold;
     } else {
-      healthColor = parseInt(VisualStyle.Colors.crimsonAccent.replace('#', '0x'));
+      healthColor = VisualStyle.ColorNumbers.crimsonAccent;
     }
 
     // Draw health bar with gradient effect
@@ -143,12 +143,12 @@ export class UIScene extends Phaser.Scene {
 
       let fillColor: number;
       let alpha: number = 1;
-      let strokeColor: number = parseInt(VisualStyle.Colors.darkWoodBrown.replace('#', '0x'));
+      let strokeColor: number = VisualStyle.ColorNumbers.darkWoodBrown;
 
       switch (fragment.state) {
         case FragmentState.COLLECTED:
         case FragmentState.PURCHASED:
-          fillColor = parseInt(VisualStyle.Colors.treasureGold.replace('#', '0x'));
+          fillColor = VisualStyle.ColorNumbers.treasureGold;
           // Add glow effect for collected fragments
           const glow = this.add.circle(0, 0, VisualStyle.FragmentVisual.glowSize, fillColor, 0.3);
           container.add(glow);
@@ -164,11 +164,11 @@ export class UIScene extends Phaser.Scene {
           });
           break;
         case FragmentState.AVAILABLE_FOR_PURCHASE:
-          fillColor = parseInt(VisualStyle.Colors.tropicalTeal.replace('#', '0x'));
+          fillColor = VisualStyle.ColorNumbers.tropicalTeal;
           break;
         case FragmentState.UNCOLLECTED:
         default:
-          fillColor = parseInt(VisualStyle.Colors.sandBeige.replace('#', '0x'));
+          fillColor = VisualStyle.ColorNumbers.sandBeige;
           alpha = 0.5;
           break;
       }
