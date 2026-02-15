@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
-import { Treasure } from '../entities/Collectible';
+import { Treasure, TreasureChest } from '../entities/Collectible';
 import { RoomGenerator } from '../systems/roomGenerator';
 import { EnemySpawner } from '../systems/enemySpawner';
 import { MapFragmentSystem, FragmentState, FragmentLocationType } from '../systems/mapFragment';
 import { CurrencySystem } from '../systems/currency';
+import { DigSystem } from '../systems/digSystem';
 import { Merchant } from '../entities/Merchant';
 import { GameConfig } from '../config/gameConfig';
 import { ProgressManager } from '../utils/progressManager';
@@ -15,13 +16,16 @@ export class GameScene extends Phaser.Scene {
   private player!: Player;
   private enemies: Enemy[] = [];
   private treasure!: Treasure;
+  private treasureChest?: TreasureChest;
   private roomGenerator!: RoomGenerator;
   private enemySpawner!: EnemySpawner;
   private mapFragmentSystem!: MapFragmentSystem;
   private currencySystem!: CurrencySystem;
+  private digSystem!: DigSystem;
   private merchant?: Merchant;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private interactKey!: Phaser.Input.Keyboard.Key;
+  private digKeyAlt!: Phaser.Input.Keyboard.Key;
   private progressManager: ProgressManager;
   private wallGraphics!: Phaser.GameObjects.Graphics;
   private lastHitTime: number = 0;
@@ -126,6 +130,21 @@ export class GameScene extends Phaser.Scene {
       // Create fragment sprites
       this.mapFragmentSystem.createFragmentSprites(this);
 
+      // Initialize dig system
+      this.digSystem = new DigSystem(this);
+
+      // Generate treasure location for digging
+      const treasureTile = this.digSystem.generateTreasureLocation(
+        dungeon.rooms,
+        playerPos,
+        (tileX: number, tileY: number) => this.roomGenerator.isWall(tileX, tileY)
+      );
+
+      // Save treasure tile to run state
+      saveManager.updateRunState({
+        treasureTile: treasureTile,
+      });
+
       // Create treasure in treasure room
       const treasureRoom = dungeon.rooms.find((r) => r.id === dungeon.treasureRoomId);
       if (treasureRoom) {
@@ -141,6 +160,7 @@ export class GameScene extends Phaser.Scene {
       // Setup input
       this.cursors = this.input.keyboard!.createCursorKeys();
       this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+      this.digKeyAlt = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
       // Setup pointer/touch input for mobile
       this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -282,6 +302,8 @@ export class GameScene extends Phaser.Scene {
       // Check if all fragments collected
       if (this.mapFragmentSystem.areAllFragmentsCollected()) {
         this.treasure.unlock();
+        // Reveal treasure location for digging
+        this.digSystem.revealTreasureLocation();
       }
     }
   }
@@ -367,6 +389,144 @@ export class GameScene extends Phaser.Scene {
       // Check if all fragments collected
       if (this.mapFragmentSystem.areAllFragmentsCollected()) {
         this.treasure.unlock();
+        // Reveal treasure location for digging
+        this.digSystem.revealTreasureLocation();
+      }
+    }
+  }
+
+  /**
+   * Handle dig attempt
+   */
+  private handleDig(): void {
+    const playerPos = this.player.getPosition();
+    const digResult = this.digSystem.dig(playerPos, this.player.health > 0);
+
+    if (!digResult) {
+      // Dig was prevented (cooldown, already spawned, or player dead)
+      return;
+    }
+
+    if (digResult.success && digResult.treasureSpawned) {
+      // Success! Spawn treasure chest
+      this.treasureChest = new TreasureChest(this, digResult.position.x, digResult.position.y);
+
+      // Setup collision with treasure chest
+      this.physics.add.overlap(
+        this.player.sprite,
+        this.treasureChest.sprite,
+        () => this.collectTreasureChest(),
+        undefined,
+        this
+      );
+
+      // Show success message
+      const text = this.add.text(
+        digResult.position.x,
+        digResult.position.y - 50,
+        'Treasure Found!',
+        {
+          fontSize: '18px',
+          color: '#ffd700',
+          backgroundColor: '#000000',
+          padding: { x: 8, y: 5 },
+        }
+      );
+      text.setOrigin(0.5);
+      this.tweens.add({
+        targets: text,
+        y: text.y - 30,
+        alpha: 0,
+        duration: 2000,
+        onComplete: () => text.destroy(),
+      });
+    } else {
+      // Wrong location - apply damage and show feedback
+      this.player.takeDamage(digResult.damageTaken);
+      this.emitGameState();
+
+      // Red screen flash
+      const flash = this.add.rectangle(
+        this.cameras.main.scrollX + this.cameras.main.width / 2,
+        this.cameras.main.scrollY + this.cameras.main.height / 2,
+        this.cameras.main.width,
+        this.cameras.main.height,
+        0xff0000,
+        0.3
+      );
+      flash.setScrollFactor(0);
+      flash.setDepth(1000);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => flash.destroy(),
+      });
+
+      // Damage popup
+      const damageText = this.add.text(
+        digResult.position.x,
+        digResult.position.y - 30,
+        `-${digResult.damageTaken}`,
+        {
+          fontSize: '20px',
+          color: '#ff0000',
+          fontStyle: 'bold',
+        }
+      );
+      damageText.setOrigin(0.5);
+      this.tweens.add({
+        targets: damageText,
+        y: damageText.y - 40,
+        alpha: 0,
+        duration: 1000,
+        onComplete: () => damageText.destroy(),
+      });
+
+      // Screen shake effect
+      this.cameras.main.shake(200, 0.005);
+
+      // Check if player died from dig damage
+      if (this.player.health <= 0) {
+        const fragmentsCollected = this.mapFragmentSystem.getCollectedCount();
+        this.progressManager.recordGameLost(fragmentsCollected);
+        this.scene.stop('UIScene');
+
+        if (window.sceneManager) {
+          window.sceneManager.loadScene('GameOverScene').then(() => {
+            this.scene.start('GameOverScene', {
+              won: false,
+              fragments: fragmentsCollected,
+            });
+          });
+        } else {
+          this.scene.start('GameOverScene', {
+            won: false,
+            fragments: fragmentsCollected,
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Collect treasure chest (spawned from digging)
+   */
+  private collectTreasureChest(): void {
+    if (this.treasureChest && !this.treasureChest.isCollected()) {
+      this.treasureChest.collect();
+
+      // Win! Lazy-load GameOverScene before transitioning
+      const fragmentsCollected = this.mapFragmentSystem.getCollectedCount();
+      this.progressManager.recordGameWon(fragmentsCollected);
+      this.scene.stop('UIScene');
+
+      if (window.sceneManager) {
+        window.sceneManager.loadScene('GameOverScene').then(() => {
+          this.scene.start('GameOverScene', { won: true, fragments: fragmentsCollected });
+        });
+      } else {
+        this.scene.start('GameOverScene', { won: true, fragments: fragmentsCollected });
       }
     }
   }
@@ -445,19 +605,32 @@ export class GameScene extends Phaser.Scene {
     // Update player
     this.player.update(this.cursors);
 
+    // Get player position once for this update cycle
+    const playerPos = this.player.getPosition();
+
+    // Handle E key and Space key
+    const nearMerchant = this.merchant && this.merchant.isPlayerInRange();
+    
+    // E key: merchant interaction when near, digging when not
+    if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      if (nearMerchant) {
+        this.purchaseFragment();
+      } else {
+        this.handleDig();
+      }
+    }
+    
+    // Space key: always dig (no merchant interaction)
+    if (Phaser.Input.Keyboard.JustDown(this.digKeyAlt)) {
+      this.handleDig();
+    }
+
     // Update merchant if exists
     if (this.merchant) {
-      const playerPos = this.player.getPosition();
       this.merchant.update(playerPos.x, playerPos.y);
-
-      // Handle interact key
-      if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
-        this.purchaseFragment();
-      }
     }
 
     // Update enemies
-    const playerPos = this.player.getPosition();
     this.enemies.forEach((enemy) => {
       enemy.update(delta, playerPos);
 

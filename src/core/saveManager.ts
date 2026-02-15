@@ -26,6 +26,9 @@ export interface RunState {
   // Currency for current run
   gold: number;
   
+  // Treasure digging
+  treasureTile?: { x: number; y: number; tileX: number; tileY: number };
+  
   // Run timestamp
   runStartTime: number;
 }
