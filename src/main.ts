@@ -114,6 +114,37 @@ const config: Phaser.Types.Core.GameConfig = {
 const game = new Phaser.Game(config);
 const sceneManager = new SceneManager(game);
 
+/**
+ * Some mobile browsers/webviews do not always trigger Phaser resize updates
+ * after orientation changes. Force a refresh + resize on viewport changes.
+ */
+function setupMobileViewportRefresh(phaserGame: Phaser.Game): void {
+  const triggerScaleRefresh = () => {
+    const scaleManager = phaserGame.scale;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    scaleManager.refresh();
+    scaleManager.resize(width, height);
+  };
+
+  const scheduleRefresh = () => {
+    triggerScaleRefresh();
+
+    // Mobile browsers can report intermediate values while rotating.
+    window.setTimeout(triggerScaleRefresh, 120);
+    window.setTimeout(triggerScaleRefresh, 300);
+  };
+
+  window.addEventListener('resize', scheduleRefresh, { passive: true });
+  window.addEventListener('orientationchange', scheduleRefresh, { passive: true });
+  window.visualViewport?.addEventListener('resize', scheduleRefresh, { passive: true });
+}
+
+if (typeof window !== 'undefined') {
+  setupMobileViewportRefresh(game);
+}
+
 // Bootstrap: Load and start BootScene
 (async () => {
   // Load BootScene first
