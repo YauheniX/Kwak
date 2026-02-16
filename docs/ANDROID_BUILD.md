@@ -109,13 +109,18 @@ If you want to build the APK locally instead of using GitHub Actions:
    npx cap sync android
    ```
 
-7. **Build the APK**:
+7. **Apply immersive Android config patch**:
+   ```bash
+   ./scripts/capacitor/apply-immersive-config.sh
+   ```
+
+8. **Build the APK**:
    ```bash
    cd android
    ./gradlew assembleDebug
    ```
 
-8. **Find the APK**:
+9. **Find the APK**:
    The APK will be located at:
    ```
    android/app/build/outputs/apk/debug/app-debug.apk
@@ -171,6 +176,16 @@ Use these exact steps after generating the Android platform (`npx cap add androi
 ### Workflow fails at "Build Android Debug APK" step
 - Check that the Android SDK components are properly installed
 - Verify that the Gradle build tools version is compatible
+
+### `chmod +x android/gradlew` fails with "No such file or directory"
+- The Android platform was not generated correctly (or was partially committed without Gradle wrapper files).
+- Regenerate and reapply config:
+  ```bash
+  rm -rf android
+  npx cap add android
+  npx cap sync android
+  ./scripts/capacitor/apply-immersive-config.sh
+  ```
 
 ### APK won't install on device
 - Ensure "Install from Unknown Sources" is enabled
