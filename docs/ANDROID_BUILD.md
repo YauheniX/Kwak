@@ -90,7 +90,8 @@ If you want to build the APK locally instead of using GitHub Actions:
 
 3. **Install Capacitor**:
    ```bash
-   npm install -g @capacitor/cli @capacitor/core @capacitor/android
+   npm install -D @capacitor/cli
+   npm install @capacitor/core @capacitor/android @capacitor/status-bar
    ```
 
 4. **Initialize Capacitor** (if not already done):
@@ -108,23 +109,81 @@ If you want to build the APK locally instead of using GitHub Actions:
    npx cap sync android
    ```
 
-7. **Build the APK**:
+7. **Apply immersive Android config patch**:
+   ```bash
+   ./scripts/capacitor/apply-immersive-config.sh
+   ```
+
+8. **Build the APK**:
    ```bash
    cd android
    ./gradlew assembleDebug
    ```
 
-8. **Find the APK**:
+9. **Find the APK**:
    The APK will be located at:
    ```
    android/app/build/outputs/apk/debug/app-debug.apk
    ```
+
+## Immersive / Edge-to-Edge setup for stable full-screen
+
+Use these exact steps after generating the Android platform (`npx cap add android`) to keep full-screen behavior stable on real devices. The repository includes `scripts/capacitor/apply-immersive-config.sh` so the native patch can be reapplied deterministically after each platform regeneration.
+
+1. **Install and sync StatusBar plugin**:
+   ```bash
+   npm install @capacitor/status-bar
+   npx cap sync android
+   ```
+
+2. **Enable overlay in `capacitor.config.ts`** (already configured in this repo):
+   ```ts
+   plugins: {
+     StatusBar: {
+       overlaysWebView: true,
+     },
+   }
+   ```
+
+3. **Apply native immersive patch script**:
+   ```bash
+   ./scripts/capacitor/apply-immersive-config.sh
+   ```
+   This script updates:
+   - `MainActivity` with `WindowCompat.setDecorFitsSystemWindows(window, false)` and `WindowInsetsControllerCompat.hide(WindowInsetsCompat.Type.systemBars())` in both `onCreate` and `onResume`.
+   - `styles.xml` with `Theme.MaterialComponents.DayNight.NoActionBar`, transparent bars, and `windowFullscreen=true`.
+   - `activity_main.xml` so root and `BridgeWebView` are `match_parent`.
+   - `AndroidManifest.xml` to apply `@style/AppTheme` to the app/activity.
+
+4. **Final sync/build check**:
+   ```bash
+   npm run build
+   npx cap sync android
+   ./scripts/capacitor/apply-immersive-config.sh
+   cd android && ./gradlew assembleDebug
+   ```
+
+5. **Runtime validation on device**:
+   - Launch app and verify game content is rendered under status bar/cutout area.
+   - Swipe to transiently show bars and check they auto-hide again.
+   - Background/foreground app and verify immersive mode is still active.
+   - Rotate device once (if orientation unlocked) and re-check insets/content bounds.
 
 ## Troubleshooting
 
 ### Workflow fails at "Build Android Debug APK" step
 - Check that the Android SDK components are properly installed
 - Verify that the Gradle build tools version is compatible
+
+### `chmod +x android/gradlew` fails with "No such file or directory"
+- The Android platform was not generated correctly (or was partially committed without Gradle wrapper files).
+- Regenerate and reapply config:
+  ```bash
+  rm -rf android
+  npx cap add android
+  npx cap sync android
+  ./scripts/capacitor/apply-immersive-config.sh
+  ```
 
 ### APK won't install on device
 - Ensure "Install from Unknown Sources" is enabled
