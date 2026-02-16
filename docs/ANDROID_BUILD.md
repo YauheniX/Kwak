@@ -128,7 +128,7 @@ If you want to build the APK locally instead of using GitHub Actions:
 
 ## Immersive / Edge-to-Edge setup for stable full-screen
 
-Use these exact steps after generating the Android platform (`npx cap add android`) to keep full-screen behavior stable on real devices. The repository includes `scripts/capacitor/apply-immersive-config.sh` so the native patch can be reapplied deterministically after each platform regeneration.
+Use these exact steps after generating the Android platform (`npx cap add android`) to keep full-screen behavior stable on real devices.
 
 1. **Install and sync StatusBar plugin**:
    ```bash
@@ -136,7 +136,7 @@ Use these exact steps after generating the Android platform (`npx cap add androi
    npx cap sync android
    ```
 
-2. **Enable overlay in `capacitor.config.ts`** (already configured in this repo):
+2. **Enable overlay in `capacitor.config.ts`**:
    ```ts
    plugins: {
      StatusBar: {
@@ -145,25 +145,27 @@ Use these exact steps after generating the Android platform (`npx cap add androi
    }
    ```
 
-3. **Apply native immersive patch script**:
-   ```bash
-   ./scripts/capacitor/apply-immersive-config.sh
-   ```
-   This script updates:
-   - `MainActivity` with `WindowCompat.setDecorFitsSystemWindows(window, false)` and `WindowInsetsControllerCompat.hide(WindowInsetsCompat.Type.systemBars())` in both `onCreate` and `onResume`.
-   - `styles.xml` with `Theme.MaterialComponents.DayNight.NoActionBar`, transparent bars, and `windowFullscreen=true`.
-   - `activity_main.xml` so root and `BridgeWebView` are `match_parent`.
-   - `AndroidManifest.xml` to apply `@style/AppTheme` to the app/activity.
+3. **Set immersive mode in `MainActivity`**:
+   - Call `WindowCompat.setDecorFitsSystemWindows(window, false)`.
+   - Hide system bars via `WindowInsetsControllerCompat.hide(WindowInsetsCompat.Type.systemBars())`.
+   - Re-apply this logic in both `onCreate` and `onResume` to handle cases where OEM ROMs restore bars when app returns to foreground.
 
-4. **Final sync/build check**:
+4. **Use fullscreen NoActionBar theme in `styles.xml`**:
+   - Base theme: `Theme.MaterialComponents.DayNight.NoActionBar`.
+   - Keep transparent `statusBarColor` and `navigationBarColor`.
+   - Keep `android:windowFullscreen=true`.
+
+5. **Ensure WebView fills the root layout**:
+   - In `activity_main.xml`, both root layout and `BridgeWebView` must use `android:layout_width="match_parent"` and `android:layout_height="match_parent"`.
+
+6. **Final sync/build check**:
    ```bash
    npm run build
    npx cap sync android
-   ./scripts/capacitor/apply-immersive-config.sh
    cd android && ./gradlew assembleDebug
    ```
 
-5. **Runtime validation on device**:
+7. **Runtime validation on device**:
    - Launch app and verify game content is rendered under status bar/cutout area.
    - Swipe to transiently show bars and check they auto-hide again.
    - Background/foreground app and verify immersive mode is still active.
