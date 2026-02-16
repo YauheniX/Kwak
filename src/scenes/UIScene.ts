@@ -1,33 +1,36 @@
 import Phaser from 'phaser';
 import { MapFragmentData, FragmentState } from '../systems/mapFragment';
 import { VisualStyle } from '../config/visualStyle';
-import { SPACING, SCALE_CONFIG } from '../config/scaleConfig';
+import { SPACING } from '../config/scaleConfig';
+import { LayoutSystem } from '../systems/layoutSystem';
 
 export class UIScene extends Phaser.Scene {
   private healthText!: Phaser.GameObjects.Text;
   private healthBar!: Phaser.GameObjects.Graphics;
+  private healthBarBg!: Phaser.GameObjects.Graphics;
   private fragmentText!: Phaser.GameObjects.Text;
   private goldText!: Phaser.GameObjects.Text;
   private levelText!: Phaser.GameObjects.Text;
   private fragmentIndicators: Phaser.GameObjects.Container[] = [];
   private maxHealth: number = 1000;
+  private currentHealth: number = 1000;
+  private layoutSystem!: LayoutSystem;
 
   constructor() {
     super({ key: 'UIScene' });
   }
 
   create(): void {
-    // Use responsive positioning based on scale config
-    const safeLeft = SPACING.sm;
-    const safeTop = SPACING.sm;
-    const safeRight = SCALE_CONFIG.baseWidth - SPACING.sm;
+    // Initialize layout system for responsive positioning
+    this.layoutSystem = new LayoutSystem(this);
+    const layout = this.layoutSystem.getLayout();
     
     // Create health bar background
-    const healthBarBg = this.add.graphics();
-    healthBarBg.fillStyle(VisualStyle.ColorNumbers.darkWoodBrown, 0.8);
-    healthBarBg.fillRoundedRect(
-      safeLeft,
-      safeTop,
+    this.healthBarBg = this.add.graphics();
+    this.healthBarBg.fillStyle(VisualStyle.ColorNumbers.darkWoodBrown, 0.8);
+    this.healthBarBg.fillRoundedRect(
+      layout.healthBar.x,
+      layout.healthBar.y,
       VisualStyle.ComponentSize.healthBarWidth,
       VisualStyle.ComponentSize.healthBarHeight,
       4
@@ -39,8 +42,8 @@ export class UIScene extends Phaser.Scene {
 
     // Health label
     this.healthText = this.add.text(
-      safeLeft + SPACING.sm,
-      safeTop + SPACING.xs,
+      layout.healthBar.x + SPACING.sm,
+      layout.healthBar.y + SPACING.xs,
       'Health: 1000',
       {
         fontSize: `${VisualStyle.Typography.fontSize.small}px`,
@@ -49,10 +52,10 @@ export class UIScene extends Phaser.Scene {
       }
     );
 
-    // Level display (NEW)
+    // Level display
     this.levelText = this.add.text(
-      safeLeft,
-      safeTop + VisualStyle.ComponentSize.healthBarHeight + SPACING.sm,
+      layout.levelDisplay.x,
+      layout.levelDisplay.y,
       'Level: 1',
       {
         fontSize: `${VisualStyle.Typography.fontSize.body}px`,
@@ -63,10 +66,10 @@ export class UIScene extends Phaser.Scene {
       }
     );
 
-    // Gold display (with icon placeholder)
+    // Gold display
     this.goldText = this.add.text(
-      safeLeft,
-      safeTop + VisualStyle.ComponentSize.healthBarHeight + SPACING.sm + SPACING.lg,
+      layout.goldDisplay.x,
+      layout.goldDisplay.y,
       '⚫ Gold: 0',
       {
         fontSize: `${VisualStyle.Typography.fontSize.body}px`,
@@ -79,8 +82,8 @@ export class UIScene extends Phaser.Scene {
 
     // Fragment display label
     this.fragmentText = this.add.text(
-      safeRight,
-      safeTop,
+      layout.fragmentTracker.x,
+      layout.fragmentTracker.y,
       'Map Fragments: 0 / 0',
       {
         fontSize: `${VisualStyle.Typography.fontSize.body}px`,
@@ -92,9 +95,62 @@ export class UIScene extends Phaser.Scene {
     );
     this.fragmentText.setOrigin(1, 0);
 
+    // Register resize handler to reposition UI elements
+    this.layoutSystem.onLayoutChange((newLayout) => {
+      this.repositionUIElements(newLayout);
+    });
+
     // Listen for updates from GameScene
     const gameScene = this.scene.get('GameScene');
     gameScene.events.on('updateUI', this.updateUI, this);
+
+    // Clean up listeners when this scene shuts down to avoid leaks / duplicates
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.layoutSystem) {
+        this.layoutSystem.destroy();
+      }
+      gameScene.events.off('updateUI', this.updateUI, this);
+    });
+  }
+
+  /**
+   * Reposition all UI elements when layout changes (e.g., screen resize)
+   */
+  private repositionUIElements(layout: ReturnType<LayoutSystem['getLayout']>): void {
+    // Reposition health bar background
+    this.healthBarBg.clear();
+    this.healthBarBg.fillStyle(VisualStyle.ColorNumbers.darkWoodBrown, 0.8);
+    this.healthBarBg.fillRoundedRect(
+      layout.healthBar.x,
+      layout.healthBar.y,
+      VisualStyle.ComponentSize.healthBarWidth,
+      VisualStyle.ComponentSize.healthBarHeight,
+      4
+    );
+
+    // Reposition health text
+    this.healthText.setPosition(
+      layout.healthBar.x + SPACING.sm,
+      layout.healthBar.y + SPACING.xs
+    );
+
+    // Reposition level display
+    this.levelText.setPosition(layout.levelDisplay.x, layout.levelDisplay.y);
+
+    // Reposition gold display
+    this.goldText.setPosition(layout.goldDisplay.x, layout.goldDisplay.y);
+
+    // Reposition fragment tracker
+    this.fragmentText.setPosition(layout.fragmentTracker.x, layout.fragmentTracker.y);
+
+    // Reposition fragment indicators
+    this.fragmentIndicators.forEach((indicator, index) => {
+      const position = this.layoutSystem.getFragmentIndicatorPosition(index);
+      indicator.setPosition(position.x, position.y);
+    });
+
+    // Force redraw health bar with stored current health
+    this.updateHealthBar(this.currentHealth, this.maxHealth);
   }
 
   private updateUI(data: {
@@ -114,6 +170,9 @@ export class UIScene extends Phaser.Scene {
       this.levelText.setText(`Level: ${data.level}`);
     }
 
+    // Store current health for resize events
+    this.currentHealth = data.health;
+
     // Update health bar
     this.updateHealthBar(data.health, this.maxHealth);
 
@@ -128,6 +187,9 @@ export class UIScene extends Phaser.Scene {
     const barWidth = VisualStyle.ComponentSize.healthBarWidth - 8;
     const currentWidth = barWidth * healthPercent;
 
+    // Get current layout position
+    const layout = this.layoutSystem.getLayout();
+
     // Determine health bar color based on health percentage
     let healthColor: number;
     if (healthPercent > 0.6) {
@@ -141,8 +203,8 @@ export class UIScene extends Phaser.Scene {
     // Draw health bar with gradient effect
     this.healthBar.fillStyle(healthColor, 1);
     this.healthBar.fillRoundedRect(
-      SPACING.sm + 4,
-      SPACING.sm + 4,
+      layout.healthBar.x + 4,
+      layout.healthBar.y + 4,
       currentWidth,
       VisualStyle.ComponentSize.healthBarHeight - 8,
       2
@@ -154,17 +216,12 @@ export class UIScene extends Phaser.Scene {
     this.fragmentIndicators.forEach((indicator) => indicator.destroy());
     this.fragmentIndicators = [];
 
-    const safeRight = SCALE_CONFIG.baseWidth - SPACING.sm;
-    const startX = safeRight;
-    const startY = SPACING.sm + VisualStyle.ComponentSize.healthBarHeight + SPACING.md;
-    const spacing = VisualStyle.ComponentSize.fragmentIndicatorSpacing;
-
     // Create visual indicators for each fragment (torn parchment style)
     fragmentData.forEach((fragment, index) => {
-      const container = this.add.container(
-        startX - index * spacing,
-        startY
-      );
+      // Get position from layout system
+      const position = this.layoutSystem.getFragmentIndicatorPosition(index);
+      
+      const container = this.add.container(position.x, position.y);
 
       let fillColor: number;
       let alpha: number = 1;
@@ -227,7 +284,6 @@ export class UIScene extends Phaser.Scene {
       }
 
       container.add(graphics);
-      // Note: Containers don't have setOrigin in Phaser 3
       this.fragmentIndicators.push(container);
     });
   }

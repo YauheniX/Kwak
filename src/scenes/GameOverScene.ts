@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { VisualStyle } from '../config/visualStyle';
+import { getAnchoredPosition, SPACING } from '../config/scaleConfig';
 
 export class GameOverScene extends Phaser.Scene {
   constructor() {
@@ -12,8 +13,9 @@ export class GameOverScene extends Phaser.Scene {
     // Set background color
     this.cameras.main.setBackgroundColor(VisualStyle.ColorNumbers.deepOceanBlue);
 
-    // Title
-    const title = this.add.text(width / 2, height / 3, data.won ? 'VICTORY!' : 'GAME OVER', {
+    // Title - positioned at top-center with offset
+    const titlePos = getAnchoredPosition('top-center', 0, SPACING.xxxl + SPACING.xl, width, height);
+    const title = this.add.text(titlePos.x, titlePos.y, data.won ? 'VICTORY!' : 'GAME OVER', {
       fontSize: `${VisualStyle.Typography.fontSize.giant}px`,
       color: data.won ? VisualStyle.Colors.treasureGold : VisualStyle.Colors.crimsonAccent,
       fontStyle: 'bold',
@@ -21,12 +23,13 @@ export class GameOverScene extends Phaser.Scene {
     });
     title.setOrigin(0.5);
 
-    // Message
+    // Message - centered on screen
     const message = data.won
       ? `You collected all map fragments and found the treasure!`
       : `You were defeated! Fragments collected: ${data.fragments}`;
 
-    const messageText = this.add.text(width / 2, height / 2, message, {
+    const messagePos = getAnchoredPosition('center', 0, 0, width, height);
+    const messageText = this.add.text(messagePos.x, messagePos.y, message, {
       fontSize: `${VisualStyle.Typography.fontSize.large}px`,
       color: VisualStyle.Colors.sandBeige,
       align: 'center',
@@ -34,8 +37,9 @@ export class GameOverScene extends Phaser.Scene {
     });
     messageText.setOrigin(0.5);
 
-    // Instructions
-    const instructions = this.add.text(width / 2, height / 2 + 60, 'Click to return to menu', {
+    // Instructions - below message using spacing constants
+    const instructionsPos = getAnchoredPosition('center', 0, SPACING.xxxl, width, height);
+    const instructions = this.add.text(instructionsPos.x, instructionsPos.y, 'Click to return to menu', {
       fontSize: `${VisualStyle.Typography.fontSize.body}px`,
       color: VisualStyle.Colors.tropicalTeal,
       fontFamily: VisualStyle.Typography.bodyFont,
