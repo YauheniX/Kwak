@@ -263,15 +263,19 @@ export function getPercentagePosition(
  * @param index - Index in the stack (0, 1, 2, ...)
  * @param spacing - Space between elements (defaults to SPACING.md)
  * @param initialOffset - Initial offset from anchor point
+ * @param width - Current width (defaults to SCALE_CONFIG.baseWidth)
+ * @param height - Current height (defaults to SCALE_CONFIG.baseHeight)
  * @returns Position object with x and y coordinates
  */
 export function getStackedPosition(
   anchor: AnchorPosition,
   index: number,
   spacing: number = SPACING.md,
-  initialOffset: { x: number; y: number } = { x: 0, y: 0 }
+  initialOffset: { x: number; y: number } = { x: 0, y: 0 },
+  width: number = SCALE_CONFIG.baseWidth,
+  height: number = SCALE_CONFIG.baseHeight
 ): { x: number; y: number } {
-  const base = getAnchoredPosition(anchor, initialOffset.x, initialOffset.y);
+  const base = getAnchoredPosition(anchor, initialOffset.x, initialOffset.y, width, height);
   
   return {
     x: base.x,

@@ -103,6 +103,14 @@ export class UIScene extends Phaser.Scene {
     // Listen for updates from GameScene
     const gameScene = this.scene.get('GameScene');
     gameScene.events.on('updateUI', this.updateUI, this);
+
+    // Clean up listeners when this scene shuts down to avoid leaks / duplicates
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.layoutSystem) {
+        this.layoutSystem.destroy();
+      }
+      gameScene.events.off('updateUI', this.updateUI, this);
+    });
   }
 
   /**
@@ -134,6 +142,12 @@ export class UIScene extends Phaser.Scene {
 
     // Reposition fragment tracker
     this.fragmentText.setPosition(layout.fragmentTracker.x, layout.fragmentTracker.y);
+
+    // Reposition fragment indicators
+    this.fragmentIndicators.forEach((indicator, index) => {
+      const position = this.layoutSystem.getFragmentIndicatorPosition(index);
+      indicator.setPosition(position.x, position.y);
+    });
 
     // Force redraw health bar with stored current health
     this.updateHealthBar(this.currentHealth, this.maxHealth);

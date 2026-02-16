@@ -33,10 +33,10 @@ export interface LayoutConfig {
   fragmentTracker: { x: number; y: number };
   fragmentIndicators: { startX: number; startY: number; spacing: number };
   
-  // Touch Controls (if needed in future)
-  joystick?: { x: number; y: number; size: number };
-  actionButton?: { x: number; y: number; size: number };
-  digButton?: { x: number; y: number; size: number };
+  // Touch Controls
+  joystick: { x: number; y: number; size: number };
+  actionButton: { x: number; y: number; size: number };
+  digButton: { x: number; y: number; size: number };
 }
 
 /**
@@ -193,18 +193,7 @@ export class LayoutSystem {
     };
   }
 
-  /**
-   * Get safe area margins
-   * Returns the margins that should be avoided to prevent UI overlap
-   */
-  public getSafeArea(): { top: number; bottom: number; left: number; right: number } {
-    return {
-      top: SPACING.sm,
-      bottom: SPACING.xxxl + SPACING.xl, // Extra space for touch controls
-      left: SPACING.sm,
-      right: SPACING.sm,
-    };
-  }
+
 
   /**
    * Cleanup - remove event listeners
