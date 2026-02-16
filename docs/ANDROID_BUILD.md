@@ -128,7 +128,7 @@ If you want to build the APK locally instead of using GitHub Actions:
 
 ## Immersive / Edge-to-Edge setup for stable full-screen
 
-Use these exact steps after generating the Android platform (`npx cap add android`) to keep full-screen behavior stable on real devices. The repository includes `scripts/capacitor/apply-immersive-config.sh` so the native patch can be reapplied deterministically after each platform regeneration.
+Use these exact steps after generating the Android platform (`npx cap add android`) to keep full-screen behavior stable on real devices.
 
 1. **Install and sync StatusBar plugin**:
    ```bash
