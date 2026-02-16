@@ -36,8 +36,8 @@ export const SCALE_CONFIG: ScaleConfig = {
   baseWidth: 1280,
   baseHeight: 720,
   
-  // FIT mode: scales game to fit screen while maintaining aspect ratio
-  scaleMode: Phaser.Scale.FIT,
+  // RESIZE mode: canvas matches viewport size directly
+  scaleMode: Phaser.Scale.RESIZE,
   
   // Center the game both horizontally and vertically
   autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -89,17 +89,24 @@ export function getRelativePosition(
  * Calculate UI safe area margins to avoid overlap with touch controls
  * Returns margins in pixels for top, bottom, left, right
  */
-export function getUISafeArea(): {
+export function getUISafeArea(
+  width: number = SCALE_CONFIG.baseWidth,
+  height: number = SCALE_CONFIG.baseHeight
+): {
   top: number;
   bottom: number;
   left: number;
   right: number;
 } {
+  const horizontalPadding = Math.max(12, Math.round(width * 0.02));
+  const verticalPadding = Math.max(12, Math.round(height * 0.02));
+  const controlPadding = Math.max(88, Math.round(height * 0.14));
+
   return {
-    top: 16,
-    bottom: 100, // Extra space for touch controls
-    left: 16,
-    right: 16,
+    top: verticalPadding,
+    bottom: controlPadding, // Extra space for touch controls
+    left: horizontalPadding,
+    right: horizontalPadding,
   };
 }
 
@@ -107,30 +114,35 @@ export function getUISafeArea(): {
  * Get touch control positions for mobile
  * Returns positions for joystick and action buttons
  */
-export function getTouchControlPositions(): {
+export function getTouchControlPositions(
+  width: number = SCALE_CONFIG.baseWidth,
+  height: number = SCALE_CONFIG.baseHeight
+): {
   joystick: { x: number; y: number };
   actionButton: { x: number; y: number };
   digButton: { x: number; y: number };
 } {
-  const safeArea = getUISafeArea();
+  const safeArea = getUISafeArea(width, height);
+  const edgeOffset = Math.max(72, Math.round(width * 0.08));
+  const bottomY = height - safeArea.bottom - 20;
   
   return {
     // Left side joystick
     joystick: {
-      x: 100,
-      y: SCALE_CONFIG.baseHeight - safeArea.bottom - 20,
+      x: edgeOffset,
+      y: bottomY,
     },
     
     // Right side action button
     actionButton: {
-      x: SCALE_CONFIG.baseWidth - 100,
-      y: SCALE_CONFIG.baseHeight - safeArea.bottom - 20,
+      x: width - edgeOffset,
+      y: bottomY,
     },
     
     // Right side dig button (above action button)
     digButton: {
-      x: SCALE_CONFIG.baseWidth - 100,
-      y: SCALE_CONFIG.baseHeight - safeArea.bottom - 100,
+      x: width - edgeOffset,
+      y: bottomY - 80,
     },
   };
 }
@@ -182,7 +194,7 @@ export function getAnchoredPosition(
   width: number = SCALE_CONFIG.baseWidth,
   height: number = SCALE_CONFIG.baseHeight
 ): { x: number; y: number } {
-  const safeArea = getUISafeArea();
+  const safeArea = getUISafeArea(width, height);
   
   let x = 0;
   let y = 0;
