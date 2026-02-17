@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import { GameConfig } from '../config/gameConfig';
-import { 
-  EnemyType, 
-  EnemyStats, 
-  getEnemyStats, 
+import {
+  EnemyType,
+  EnemyStats,
+  getEnemyStats,
   HEALTH_BAR_CONFIG,
-  DAMAGE_NUMBER_CONFIG
+  DAMAGE_NUMBER_CONFIG,
 } from '../config/enemyBalance';
 
 /**
@@ -18,50 +18,61 @@ export interface EnemyAIConfig {
   speed?: number; // Movement speed
 }
 
+const ENEMY_TEXTURE_BY_TYPE: Record<EnemyType, string> = {
+  [EnemyType.WEAK]: 'enemy-weak-tile',
+  [EnemyType.FAST]: 'enemy-fast-tile',
+  [EnemyType.TANK]: 'enemy-tank-tile',
+};
+
 export class Enemy {
-  public sprite: Phaser.GameObjects.Arc;
+  public sprite: Phaser.GameObjects.Image;
   private scene: Phaser.Scene;
   private targetX: number;
   private targetY: number;
   private moveTimer: number = 0;
   private config: Required<EnemyAIConfig>;
-  
+
   // Health system
   public readonly type: EnemyType;
   public maxHealth: number;
   public currentHealth: number;
   public damage: number;
-  
+
   // Visual elements
   private healthBarBg!: Phaser.GameObjects.Graphics;
   private healthBarFill!: Phaser.GameObjects.Graphics;
   private isDestroyed: boolean = false;
 
   constructor(
-    scene: Phaser.Scene, 
-    x: number, 
-    y: number, 
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
     type: EnemyType = EnemyType.WEAK,
     level: number = 1,
     aiConfig: EnemyAIConfig = {}
   ) {
     this.scene = scene;
     this.type = type;
-    
+
     // Get stats for this enemy type and level
     const stats: EnemyStats = getEnemyStats(type, level);
     this.maxHealth = stats.maxHealth;
     this.currentHealth = stats.currentHealth;
     this.damage = stats.damage;
-    
+
+    const textureKey = ENEMY_TEXTURE_BY_TYPE[type] ?? ENEMY_TEXTURE_BY_TYPE[EnemyType.WEAK];
+
     // Create sprite with type-specific appearance
-    this.sprite = scene.add.circle(x, y, stats.size, stats.color);
+    this.sprite = scene.add
+      .image(x, y, textureKey)
+      .setDisplaySize(stats.size * 2.2, stats.size * 2.2)
+      .setDepth(9);
     // Enable click/tap interactions (used for attacking on mobile/desktop)
-    // Default hit area from the shape bounds is sufficient and reliable.
     this.sprite.setInteractive();
     scene.physics.add.existing(this.sprite);
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     body.setCollideWorldBounds(true);
+    body.setSize(stats.size * 1.8, stats.size * 1.8, true);
 
     this.targetX = x;
     this.targetY = y;
@@ -73,7 +84,7 @@ export class Enemy {
       patrolRange: aiConfig.patrolRange ?? stats.patrolRange,
       speed: aiConfig.speed ?? stats.speed,
     };
-    
+
     // Create health bar
     this.createHealthBar();
   }
@@ -85,11 +96,11 @@ export class Enemy {
     // Background
     this.healthBarBg = this.scene.add.graphics();
     this.healthBarBg.setDepth(100);
-    
+
     // Fill
     this.healthBarFill = this.scene.add.graphics();
     this.healthBarFill.setDepth(101);
-    
+
     this.updateHealthBar();
   }
 
@@ -98,26 +109,30 @@ export class Enemy {
    */
   private updateHealthBar(): void {
     if (this.isDestroyed) return;
-    
+
     const x = this.sprite.x - HEALTH_BAR_CONFIG.width / 2;
     const y = this.sprite.y + HEALTH_BAR_CONFIG.offsetY;
-    
+
     // Clear and redraw background
     this.healthBarBg.clear();
-    this.healthBarBg.fillStyle(HEALTH_BAR_CONFIG.backgroundColor, HEALTH_BAR_CONFIG.backgroundAlpha);
+    this.healthBarBg.fillStyle(
+      HEALTH_BAR_CONFIG.backgroundColor,
+      HEALTH_BAR_CONFIG.backgroundAlpha
+    );
     this.healthBarBg.fillRect(x, y, HEALTH_BAR_CONFIG.width, HEALTH_BAR_CONFIG.height);
-    
+
     // Border
     this.healthBarBg.lineStyle(HEALTH_BAR_CONFIG.borderWidth, HEALTH_BAR_CONFIG.borderColor);
     this.healthBarBg.strokeRect(x, y, HEALTH_BAR_CONFIG.width, HEALTH_BAR_CONFIG.height);
-    
+
     // Health fill
     const healthPercent = this.currentHealth / this.maxHealth;
     const fillWidth = HEALTH_BAR_CONFIG.width * healthPercent;
-    const fillColor = healthPercent < HEALTH_BAR_CONFIG.lowHealthThreshold
-      ? HEALTH_BAR_CONFIG.lowHealthColor
-      : HEALTH_BAR_CONFIG.healthColor;
-    
+    const fillColor =
+      healthPercent < HEALTH_BAR_CONFIG.lowHealthThreshold
+        ? HEALTH_BAR_CONFIG.lowHealthColor
+        : HEALTH_BAR_CONFIG.healthColor;
+
     this.healthBarFill.clear();
     this.healthBarFill.fillStyle(fillColor, 1);
     this.healthBarFill.fillRect(x, y, fillWidth, HEALTH_BAR_CONFIG.height);
@@ -128,13 +143,13 @@ export class Enemy {
    */
   takeDamage(amount: number): boolean {
     if (this.isDestroyed) return false;
-    
+
     this.currentHealth = Math.max(0, this.currentHealth - amount);
     this.updateHealthBar();
-    
+
     // Show floating damage number
     this.showDamageNumber(amount);
-    
+
     // Flash sprite
     this.scene.tweens.add({
       targets: this.sprite,
@@ -143,13 +158,13 @@ export class Enemy {
       yoyo: true,
       repeat: 1,
     });
-    
+
     // Check if killed
     if (this.currentHealth <= 0) {
       this.playDeathAnimation();
       return true;
     }
-    
+
     return false;
   }
 
@@ -157,19 +172,14 @@ export class Enemy {
    * Show floating damage number
    */
   private showDamageNumber(damage: number): void {
-    const text = this.scene.add.text(
-      this.sprite.x,
-      this.sprite.y - 20,
-      `-${damage}`,
-      {
-        fontSize: DAMAGE_NUMBER_CONFIG.fontSize,
-        color: DAMAGE_NUMBER_CONFIG.fontColor,
-        fontStyle: DAMAGE_NUMBER_CONFIG.fontStyle,
-      }
-    );
+    const text = this.scene.add.text(this.sprite.x, this.sprite.y - 20, `-${damage}`, {
+      fontSize: DAMAGE_NUMBER_CONFIG.fontSize,
+      color: DAMAGE_NUMBER_CONFIG.fontColor,
+      fontStyle: DAMAGE_NUMBER_CONFIG.fontStyle,
+    });
     text.setOrigin(0.5);
     text.setDepth(200);
-    
+
     // Float upward and fade
     this.scene.tweens.add({
       targets: text,
@@ -212,7 +222,7 @@ export class Enemy {
 
   update(delta: number, playerPos: { x: number; y: number }): void {
     if (this.isDestroyed || this.isDead()) return;
-    
+
     this.moveTimer += delta;
 
     if (this.moveTimer >= this.config.patrolMoveDelay) {
@@ -246,7 +256,7 @@ export class Enemy {
   private moveTowardsTarget(): void {
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     if (!body) return; // Safety check for body initialization
-    
+
     const angle = Phaser.Math.Angle.Between(
       this.sprite.x,
       this.sprite.y,
@@ -254,16 +264,13 @@ export class Enemy {
       this.targetY
     );
 
-    body.setVelocity(
-      Math.cos(angle) * this.config.speed,
-      Math.sin(angle) * this.config.speed
-    );
+    body.setVelocity(Math.cos(angle) * this.config.speed, Math.sin(angle) * this.config.speed);
   }
 
   destroy(): void {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
-    
+
     this.sprite.destroy();
     this.healthBarBg?.destroy();
     this.healthBarFill?.destroy();

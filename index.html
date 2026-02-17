@@ -4,19 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kwak - Roguelike Game</title>
-    <style>
+    <link rel="icon" type="image/png" href="public/assets/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="public/assets/favicon.svg" />
+    <link rel="shortcut icon" href="public/assets/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="public/assets/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Kwak" />
+    <link rel="manifest" href="public/assets/site.webmanifest" />    <style>
+      /* Page background uses Kenney preview with a blue overlay for readability */
       body {
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background: #000;
+        background-image: linear-gradient(rgba(31,60,136,0.65), rgba(31,60,136,0.65)), url('/assets/preview.png');
+        background-size: cover;
+        background-position: center center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        /* fallback color */
+        background-color: #1F3C88;
       }
+
+      /* Keep the game container centered and transparent so background shows through */
       #game-container {
         display: flex;
         justify-content: center;
         align-items: center;
         width: 100vw;
         height: 100vh;
+        background: transparent;
       }
     </style>
   </head>

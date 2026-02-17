@@ -14,8 +14,53 @@ export class PreloadScene extends Phaser.Scene {
     });
     loadingText.setOrigin(0.5);
 
-    // Since we're using shapes, there's nothing to actually preload
-    // But this scene demonstrates the structure
+    // Dungeon tile textures from kenney_monochrome-pirates pack
+    // Menu background (preview) used by MenuScene
+    this.load.image('menu-background', '/assets/preview.png');
+    this.load.image(
+      'dungeon-wall-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0018.png'
+    );
+    this.load.image(
+      'dungeon-floor-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0021.png'
+    );
+    this.load.image(
+      'player-ship-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0124.png'
+    );
+    this.load.image(
+      'player-shovel-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0087.png'
+    );
+    this.load.image(
+      'enemy-weak-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0127.png'
+    );
+    this.load.image(
+      'enemy-fast-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0125.png'
+    );
+    this.load.image(
+      'enemy-tank-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0126.png'
+    );
+    this.load.image(
+      'merchant-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0127.png'
+    );
+    this.load.image(
+      'treasure-locked-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0134.png'
+    );
+    this.load.image(
+      'treasure-unlocked-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0135.png'
+    );
+    this.load.image(
+      'treasure-chest-tile',
+      'assets/kenney_monochrome-pirates/Monochrome/Tiles/tile_0101.png'
+    );
   }
 
   create(): void {

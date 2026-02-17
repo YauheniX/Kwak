@@ -2,18 +2,26 @@ import Phaser from 'phaser';
 import { GameConfig } from '../config/gameConfig';
 
 export class Player {
-  public sprite: Phaser.GameObjects.Arc;
+  public sprite: Phaser.GameObjects.Image;
   public health: number = 100;
   private targetX: number | null = null;
   private targetY: number | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    this.sprite = scene.add.circle(x, y, GameConfig.playerSize, GameConfig.playerColor);
+    this.sprite = scene.add
+      .image(x, y, 'player-ship-tile')
+      .setDisplaySize(GameConfig.tileSize, GameConfig.tileSize)
+      .setDepth(10);
     // Enable tap/click on player (used to toggle tools like the shovel)
     this.sprite.setInteractive();
     scene.physics.add.existing(this.sprite);
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     body.setCollideWorldBounds(true);
+    body.setSize(GameConfig.playerSize * 1.8, GameConfig.playerSize * 1.8, true);
+  }
+
+  setShovelMode(enabled: boolean): void {
+    this.sprite.setTexture(enabled ? 'player-shovel-tile' : 'player-ship-tile');
   }
 
   update(cursors: Phaser.Types.Input.Keyboard.CursorKeys): void {

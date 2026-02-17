@@ -13,9 +13,17 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     const { width, height } = this.cameras.main;
-
-    // Set background color to deep ocean blue
-    this.cameras.main.setBackgroundColor(VisualStyle.ColorNumbers.deepOceanBlue);
+    // Add a full-screen background image if available, otherwise fall back to color
+    if (this.textures.exists('menu-background')) {
+      const bg = this.add.image(0, 0, 'menu-background').setOrigin(0, 0);
+      bg.setDisplaySize(width, height);
+      bg.setScrollFactor(0);
+      // apply a subtle tint overlay to match visual style
+      bg.setTint(VisualStyle.ColorNumbers.deepOceanBlue);
+      bg.setAlpha(0.8);
+    } else {
+      this.cameras.main.setBackgroundColor(VisualStyle.ColorNumbers.deepOceanBlue);
+    }
 
     // Title - positioned at top-center with offset
     const titlePos = getAnchoredPosition('top-center', 0, SPACING.xxxl, width, height);
