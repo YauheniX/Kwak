@@ -265,31 +265,32 @@ export class GameScene extends Phaser.Scene {
             }
           }
 
-          // Start long-press dig timer (ground only)
-          this.cancelDigHold();
-          this.digHoldPointerId = pointer.id;
-          this.digHoldStartX = pointer.worldX;
-          this.digHoldStartY = pointer.worldY;
-          this.digHoldStartTime = this.time.now;
-          this.startDigHoldIndicator(pointer.worldX, pointer.worldY);
-          this.digHoldTimer = this.time.delayedCall(this.digHoldThresholdMs, () => {
-            // Only dig if the same pointer is still down and hasn't moved much
-            if (!pointer.isDown || this.digHoldPointerId !== pointer.id) {
-              return;
-            }
-            const moved = Phaser.Math.Distance.Between(
-              this.digHoldStartX,
-              this.digHoldStartY,
-              pointer.worldX,
-              pointer.worldY
-            );
-            if (moved <= this.digHoldMoveTolerance) {
-              this.playDigHoldCompleteAnimation();
-              this.handleDig();
-            }
-          });
-
-          this.player.setTarget(pointer.worldX, pointer.worldY);
+          if (this.shovelMode) {
+            // Start long-press dig timer (ground only)
+            this.cancelDigHold();
+            this.digHoldPointerId = pointer.id;
+            this.digHoldStartX = pointer.worldX;
+            this.digHoldStartY = pointer.worldY;
+            this.digHoldStartTime = this.time.now;
+            this.startDigHoldIndicator(pointer.worldX, pointer.worldY);
+            this.digHoldTimer = this.time.delayedCall(this.digHoldThresholdMs, () => {
+              // Only dig if the same pointer is still down and hasn't moved much
+              if (!pointer.isDown || this.digHoldPointerId !== pointer.id) {
+                return;
+              }
+              const moved = Phaser.Math.Distance.Between(
+                this.digHoldStartX,
+                this.digHoldStartY,
+                pointer.worldX,
+                pointer.worldY
+              );
+              if (moved <= this.digHoldMoveTolerance) {
+                this.playDigHoldCompleteAnimation();
+                this.handleDig();
+              }
+            });
+        }
+        this.player.setTarget(pointer.worldX, pointer.worldY);
         }
       );
 
@@ -517,6 +518,8 @@ export class GameScene extends Phaser.Scene {
    * Handle dig attempt
    */
   private handleDig(): void {
+    if (!this.shovelMode) return;
+
     const playerPos = this.player.getPosition();
     const digResult = this.digSystem.dig(playerPos, this.player.health > 0);
 

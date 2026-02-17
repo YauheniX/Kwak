@@ -12,8 +12,8 @@ export class UIScene extends Phaser.Scene {
   private goldText!: Phaser.GameObjects.Text;
   private levelText!: Phaser.GameObjects.Text;
   private fragmentIndicators: Phaser.GameObjects.Container[] = [];
-  private maxHealth: number = 1000;
-  private currentHealth: number = 1000;
+  private maxHealth: number = 100;
+  private currentHealth: number = 100;
   private layoutSystem!: LayoutSystem;
 
   constructor() {
@@ -44,7 +44,7 @@ export class UIScene extends Phaser.Scene {
     this.healthText = this.add.text(
       layout.healthBar.x + SPACING.sm,
       layout.healthBar.y + SPACING.xs,
-      'Health: 1000',
+      'Health: 100',
       {
         fontSize: `${VisualStyle.Typography.fontSize.small}px`,
         color: VisualStyle.Colors.sandBeige,

@@ -3,7 +3,7 @@ import { GameConfig } from '../config/gameConfig';
 
 export class Player {
   public sprite: Phaser.GameObjects.Arc;
-  public health: number = 1000; // Much higher health for easier gameplay
+  public health: number = 100;
   private targetX: number | null = null;
   private targetY: number | null = null;
 
