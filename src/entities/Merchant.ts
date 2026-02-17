@@ -1,21 +1,24 @@
 import Phaser from 'phaser';
+import { GameConfig } from '../config/gameConfig';
 
 /**
  * Merchant entity for selling fragments and items
  */
 export class Merchant {
-  public sprite: Phaser.GameObjects.Arc;
+  public sprite: Phaser.GameObjects.Image;
   public interactionRadius: number = 96;
   private promptText?: Phaser.GameObjects.Text;
   private isPlayerNearby: boolean = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    // Create merchant sprite (purple/magenta circle for now - easy to replace with sprite)
-    this.sprite = scene.add.circle(x, y, 20, 0xff00ff);
+    this.sprite = scene.add
+      .image(x, y, 'merchant-tile')
+      .setDisplaySize(GameConfig.tileSize, GameConfig.tileSize)
+      .setDepth(9);
     // Enable tap/click interaction on mobile/desktop
     this.sprite.setInteractive();
     scene.physics.add.existing(this.sprite, true); // static body
-    
+
     // Add a visual indicator (star or crown effect)
     const indicator = scene.add.circle(x, y - 30, 8, 0xffff00);
     scene.tweens.add({
@@ -41,12 +44,7 @@ export class Merchant {
    * Update merchant (check player proximity)
    */
   update(playerX: number, playerY: number): void {
-    const distance = Phaser.Math.Distance.Between(
-      this.sprite.x,
-      this.sprite.y,
-      playerX,
-      playerY
-    );
+    const distance = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, playerX, playerY);
 
     const wasNearby = this.isPlayerNearby;
     this.isPlayerNearby = distance <= this.interactionRadius;

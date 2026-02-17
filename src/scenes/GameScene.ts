@@ -30,7 +30,9 @@ export class GameScene extends Phaser.Scene {
   private digKeyAlt!: Phaser.Input.Keyboard.Key;
   private attackKey!: Phaser.Input.Keyboard.Key;
   private progressManager: ProgressManager;
-  private wallGraphics!: Phaser.GameObjects.Graphics;
+  private wallGraphics?: Phaser.GameObjects.Graphics;
+  private wallSprites: Phaser.GameObjects.Image[] = [];
+  private floorSprites: Phaser.GameObjects.Image[] = [];
   private wallBodies?: Phaser.Physics.Arcade.StaticGroup;
   private lastHitTime: number = 0;
   private hitCooldown: number = 2000; // 2 second cooldown between hits
@@ -343,12 +345,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawWalls(): void {
-    if (this.wallGraphics) {
-      this.wallGraphics.destroy();
-    }
+    this.wallGraphics?.destroy();
+    this.wallGraphics = undefined;
 
-    this.wallGraphics = this.add.graphics();
-    this.wallGraphics.fillStyle(VisualStyle.ColorNumbers.wallColor, 1);
+    this.wallSprites.forEach((sprite) => sprite.destroy());
+    this.wallSprites = [];
+
+    this.floorSprites.forEach((sprite) => sprite.destroy());
+    this.floorSprites = [];
+
+    const hasFloorTexture = this.textures.exists('dungeon-floor-tile');
+    const hasWallTexture = this.textures.exists('dungeon-wall-tile');
+
+    if (!hasWallTexture) {
+      this.wallGraphics = this.add.graphics();
+      this.wallGraphics.fillStyle(VisualStyle.ColorNumbers.wallColor, 1);
+    }
 
     // Clear previous wall colliders
     if (this.wallBodies) {
@@ -362,15 +374,41 @@ export class GameScene extends Phaser.Scene {
     // Render + build physics for every wall tile so visuals match collisions
     for (let x = 0; x < mapWidth; x++) {
       for (let y = 0; y < mapHeight; y++) {
-        if (!this.roomGenerator.isWall(x, y)) {
+        const isWall = this.roomGenerator.isWall(x, y);
+        const worldX = x * tileSize;
+        const worldY = y * tileSize;
+
+        if (!isWall) {
+          if (hasFloorTexture) {
+            const floor = this.add
+              .image(worldX, worldY, 'dungeon-floor-tile')
+              .setOrigin(0)
+              .setDisplaySize(tileSize, tileSize)
+              .setDepth(-10);
+            this.floorSprites.push(floor);
+          }
           continue;
         }
 
-        this.wallGraphics.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+        if (hasWallTexture) {
+          const wall = this.add
+            .image(worldX, worldY, 'dungeon-wall-tile')
+            .setOrigin(0)
+            .setDisplaySize(tileSize, tileSize)
+            .setDepth(-5);
+
+          if (this.isWallEdge(x, y)) {
+            wall.setTint(0xd9f2ff);
+          }
+
+          this.wallSprites.push(wall);
+        } else {
+          this.wallGraphics?.fillRect(worldX, worldY, tileSize, tileSize);
+        }
 
         const wallRect = this.add.rectangle(
-          x * tileSize + tileSize / 2,
-          y * tileSize + tileSize / 2,
+          worldX + tileSize / 2,
+          worldY + tileSize / 2,
           tileSize,
           tileSize,
           0x000000,
@@ -382,6 +420,18 @@ export class GameScene extends Phaser.Scene {
       }
     }
   }
+
+  private isWallEdge(tileX: number, tileY: number): boolean {
+    const neighbors: Array<[number, number]> = [
+      [tileX - 1, tileY],
+      [tileX + 1, tileY],
+      [tileX, tileY - 1],
+      [tileX, tileY + 1],
+    ];
+
+    return neighbors.some(([x, y]) => !this.roomGenerator.isWall(x, y));
+  }
+
 
   private setupCollisions(): void {
     // Player collects fragments
@@ -775,9 +825,7 @@ export class GameScene extends Phaser.Scene {
 
   private setShovelMode(enabled: boolean): void {
     this.shovelMode = enabled;
-    // Visual feedback: change player color while holding the shovel
-    const color = enabled ? VisualStyle.ColorNumbers.treasureGold : GameConfig.playerColor;
-    this.player.sprite.setFillStyle(color, 1);
+    this.player.setShovelMode(enabled);
   }
 
   private cancelDigHold(): void {
