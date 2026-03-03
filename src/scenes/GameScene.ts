@@ -13,6 +13,10 @@ import { ProgressManager } from '../utils/progressManager';
 import { saveManager } from '../core/saveManager';
 import { VisualStyle } from '../config/visualStyle';
 import { progressionSystem } from '../systems/progressionSystem';
+import { InputController } from '../input/InputController';
+import { KeyboardInputController } from '../input/KeyboardInputController';
+import { VirtualJoystickInputController } from '../input/VirtualJoystickInputController';
+import { CombinedInputController } from '../input/CombinedInputController';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -52,6 +56,10 @@ export class GameScene extends Phaser.Scene {
   private shovelMode: boolean = false;
   private collisionsEnabled: boolean = false;
   private currentLevel: number = 1;
+  // Input abstraction – movement logic uses only InputController, not cursors directly.
+  private inputController!: InputController;
+  // Joystick is only instantiated on touch-capable devices.
+  private joystickInput?: VirtualJoystickInputController;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -224,6 +232,24 @@ export class GameScene extends Phaser.Scene {
       this.digKeyAlt = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
       this.attackKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F);
 
+      // Build input abstraction:
+      // On touch-capable devices a virtual joystick is shown in the bottom-left
+      // corner; keyboard always remains available as a fallback (desktop / gamepad
+      // users are unaffected).  Mobile detection uses navigator.maxTouchPoints to
+      // avoid unreliable user-agent sniffing.
+      const keyboardInput = new KeyboardInputController(this.cursors);
+      if (navigator.maxTouchPoints > 0) {
+        this.joystickInput = new VirtualJoystickInputController(this);
+        this.inputController = new CombinedInputController(this.joystickInput, keyboardInput);
+      } else {
+        this.inputController = keyboardInput;
+      }
+
+      // Clean up joystick graphics and listeners when the scene shuts down.
+      this.events.once('shutdown', () => {
+        this.joystickInput?.destroy();
+      });
+
       // Pointer/touch:
       // - tap enemy => attack
       // - tap merchant => interact (or walk to merchant if too far)
@@ -233,6 +259,11 @@ export class GameScene extends Phaser.Scene {
         'pointerdown',
         (pointer: Phaser.Input.Pointer, currentlyOver: Phaser.GameObjects.GameObject[]) => {
           if (!this.player || !this.scene.isActive('GameScene')) {
+            return;
+          }
+
+          // If the joystick is consuming this pointer, skip all world-space handling.
+          if (this.joystickInput?.isPointerInArea(pointer.x, pointer.y)) {
             return;
           }
 
@@ -906,7 +937,7 @@ export class GameScene extends Phaser.Scene {
 
   override update(_time: number, delta: number): void {
     // Update player
-    this.player.update(this.cursors);
+    this.player.update(this.inputController);
 
     // Get player position once for this update cycle
     const playerPos = this.player.getPosition();

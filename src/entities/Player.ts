@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameConfig } from '../config/gameConfig';
+import { InputController } from '../input/InputController';
 
 export class Player {
   public sprite: Phaser.GameObjects.Image;
@@ -24,37 +25,32 @@ export class Player {
     this.sprite.setTexture(enabled ? 'player-shovel-tile' : 'player-ship-tile');
   }
 
-  update(cursors: Phaser.Types.Input.Keyboard.CursorKeys): void {
+  /**
+   * Moves the player sprite based on the provided InputController.
+   *
+   * The update loop depends ONLY on input.getHorizontal() / input.getVertical()
+   * so that keyboard and virtual joystick share this path without modification.
+   * Tap-to-move (setTarget) remains available as a fallback for pointer taps
+   * that are not captured by the joystick.
+   */
+  update(input: InputController): void {
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
 
     body.setVelocity(0);
 
-    // Keyboard controls
-    let keyboardActive = false;
-    if (cursors.left.isDown) {
-      body.setVelocityX(-GameConfig.playerSpeed);
-      keyboardActive = true;
-    } else if (cursors.right.isDown) {
-      body.setVelocityX(GameConfig.playerSpeed);
-      keyboardActive = true;
-    }
+    const h = input.getHorizontal();
+    const v = input.getVertical();
 
-    if (cursors.up.isDown) {
-      body.setVelocityY(-GameConfig.playerSpeed);
-      keyboardActive = true;
-    } else if (cursors.down.isDown) {
-      body.setVelocityY(GameConfig.playerSpeed);
-      keyboardActive = true;
-    }
-
-    // If keyboard is active, clear touch target
-    if (keyboardActive) {
+    if (input.isActive()) {
+      // Directional input is present – clear any tap-to-move target.
       this.targetX = null;
       this.targetY = null;
+      body.setVelocityX(h * GameConfig.playerSpeed);
+      body.setVelocityY(v * GameConfig.playerSpeed);
     }
 
-    // Touch/Mouse movement
-    if (this.targetX !== null && this.targetY !== null && !keyboardActive) {
+    // Touch/Mouse tap-to-move (used when no directional input is active).
+    if (this.targetX !== null && this.targetY !== null && !input.isActive()) {
       const distance = Phaser.Math.Distance.Between(
         this.sprite.x,
         this.sprite.y,
@@ -62,13 +58,12 @@ export class Player {
         this.targetY
       );
 
-      // If close enough to target, stop moving
+      // Stop when close enough to the target.
       if (distance < 10) {
         this.targetX = null;
         this.targetY = null;
         body.setVelocity(0);
       } else {
-        // Move towards target
         const angle = Phaser.Math.Angle.Between(
           this.sprite.x,
           this.sprite.y,
@@ -82,7 +77,7 @@ export class Player {
       }
     }
 
-    // Normalize diagonal movement
+    // Normalize diagonal movement to maintain consistent speed.
     if (body.velocity.x !== 0 && body.velocity.y !== 0) {
       body.velocity.normalize().scale(GameConfig.playerSpeed);
     }
